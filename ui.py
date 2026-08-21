@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import math
-from pathlib import Path
 
 import streamlit as st
 
 # 设置Streamlit主题 - 必须是第一个st命令
-st.set_page_config(layout="wide", page_title="AI代码审查平台", page_icon="🤖", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AI代码审查平台", initial_sidebar_state="expanded")
 
 import datetime
 import os
@@ -15,35 +14,12 @@ import base64
 import time
 import pandas as pd
 from dotenv import load_dotenv
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import matplotlib.font_manager as fm
 import streamlit as st
 
 from biz.service.review_service import ReviewService
-from matplotlib.ticker import MaxNLocator
 from streamlit_cookies_manager import CookieManager
 
 load_dotenv("conf/.env")
-
-
-def set_global_font():
-    """设置全局字体，如果字体文件不存在则忽略并使用默认字体"""
-    font_path = "fonts/SourceHanSansCN-Regular.otf"
-    if Path(font_path).exists():
-        try:
-            fm.fontManager.addfont(font_path)
-            mpl.rcParams["font.family"] = "Source Han Sans CN"
-        except Exception as e:
-            st.warning(f"字体加载失败，使用默认字体。错误信息：{e}")
-    else:
-        st.warning(f"字体文件未找到：{font_path}，将使用默认字体。")
-
-    mpl.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
-
-
-# 在项目启动时调用
-set_global_font()
 
 # 从环境变量中读取用户名和密码
 DASHBOARD_USER = os.getenv("DASHBOARD_USER", "admin")
@@ -189,323 +165,463 @@ def get_data(service_func, authors=None, project_names=None, updated_at_gte=None
     return data
 
 
-# 隐藏默认的Streamlit菜单和页眉（display:none 避免 visibility:hidden 仍占位导致顶部留白）
-st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        header[data-testid="stHeader"] {display: none !important;}
-        footer {visibility: hidden;}
-        div.block-container {padding-top: 0rem !important; padding-bottom: 0.5rem !important;}
-        .main .block-container {margin-top: 0 !important;}
-        section[data-testid="stMain"] > div {padding-top: 0rem !important;}
-    </style>
-    """, unsafe_allow_html=True)
+# ============ 深色终端美学 · 全局样式 ============
+GLOBAL_CSS = """
+<style>
+/* ---- 自托管思源黑体（woff2 子集，避免客户端系统字体差异） ---- */
+@font-face {
+    font-family: "SourceHanSansSC";
+    src: url("/app/static/fonts/SourceHanSansSC-subset.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
 
-# 自定义CSS样式
-st.markdown(
-    """
-    <style>
-    .main {
-        background-color: #f0f2f6;
-        padding-top: 0rem;
-    }
-    .stButton>button {
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 20px;
-        padding: 0.5rem 2rem;
-        border: none;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #45a049;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        color: #ffffff;  /* 设置悬停时的文字颜色为白色 */
-    }
+:root {
+    --bg: #0A0E17;
+    --card: rgba(16, 24, 42, 0.82);
+    --card-solid: #0E1526;
+    --border: rgba(148, 163, 184, 0.14);
+    --border-strong: rgba(148, 163, 184, 0.26);
+    --text: #E2E8F0;
+    --text-dim: #94A3B8;
+    --text-faint: #5B6B82;
+    --accent: #22D3EE;
+    --green: #4ADE80;
+    --amber: #FBBF24;
+    --red: #FB7185;
+    --purple: #C084FC;
+    --mono: "JetBrains Mono", "Cascadia Code", "SF Mono", "Fira Code", "IBM Plex Mono",
+            Consolas, "SourceHanSansSC", "PingFang SC", "Microsoft YaHei", monospace;
+    --sans: "SourceHanSansSC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+            -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
 
-    .stTextInput>div>div>input {
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 0.5rem;
-    }
-    .stCheckbox>div>div>input {
-        accent-color: #4CAF50;
-    }
-    .stDataFrame {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-    .stMarkdown {font-size: 18px;}
-    .login-title {
-        text-align: center;
-        color: #2E4053;
-        margin: 0.5rem 0;
-        font-size: 2.2rem;
-        font-weight: bold;
-    }
-    .login-container {
-        background-color: white;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        margin-top: 0rem;
-    }
-    .platform-icon {
-        font-size: 3.5rem;
-        margin-bottom: 0.5rem;
-        text-align: center;
-    }
-    /* Pro 版链接 - 与退出登录按钮同高同风格 */
-    a.pro-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.5rem 2rem;
-        background: linear-gradient(135deg, #5b6bc0 0%, #7c4dff 100%);
-        color: #fff !important;
-        text-decoration: none;
-        border-radius: 20px;
-        font-size: 1rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-        border: none;
-        box-sizing: border-box;
-        min-height: 2.25rem;
-        line-height: 1.5;
-        white-space: nowrap;
-    }
-    a.pro-link:hover {
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        color: #fff !important;
-    }
-    .pro-link-wrap {
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        margin-left: 0.5rem;
-        min-width: 0;
-        overflow: hidden;
-    }
-    .pro-link-wrap .pro-link {
-        max-width: 100%;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+/* ---- 全局字体与渲染 ---- */
+html, body, [class*="css"], [data-testid="stAppViewContainer"] {
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-kerning: normal;
+}
+
+/* ---- 隐藏默认 chrome ---- */
+#MainMenu {visibility: hidden;}
+header[data-testid="stHeader"] {display: none !important;}
+footer {visibility: hidden;}
+div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !important;}
+
+/* ---- 等宽数字对齐（避免表格/指标数字跳动） ---- */
+[data-testid="stMetricValue"],
+[data-testid="stDataFrame"] td,
+.kpi-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+/* ---- 页面背景：墨蓝黑 + 细网格纹理 + 微弱光晕 ---- */
+[data-testid="stAppViewContainer"] {
+    background-color: var(--bg);
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+        radial-gradient(circle at 12% -5%, rgba(34, 211, 238, 0.09), transparent 42%),
+        radial-gradient(circle at 92% 6%, rgba(74, 222, 128, 0.05), transparent 38%),
+        radial-gradient(circle at 70% 95%, rgba(192, 132, 252, 0.05), transparent 40%);
+    background-size: 32px 32px, 32px 32px, auto, auto, auto;
+    background-attachment: fixed;
+}
+
+/* ---- 侧边栏 ---- */
+[data-testid="stSidebar"] {
+    background: #0C1220;
+    border-right: 1px solid var(--border);
+}
+[data-testid="stSidebar"] .block-container {padding-top: 1.1rem !important;}
+.side-label {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    color: var(--text-faint);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0.6rem 0 0.25rem 0;
+}
+.side-label::before {content: "// "; color: var(--accent);}
+.side-version {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    color: var(--text-faint);
+    margin-top: 1.2rem;
+}
+
+/* ---- 顶部标题 ---- */
+.dash-heading-bar h4 {
+    font-family: var(--sans);
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.dash-subtitle {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-top: 0.2rem;
+}
+.dash-subtitle b {color: var(--accent); font-weight: 600;}
+
+/* ---- LIVE 状态灯 ---- */
+.live-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 8px;
+}
+.live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
+    animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse {0%, 100% {opacity: 1;} 50% {opacity: 0.3;}}
+.live-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--green);
+    letter-spacing: 0.14em;
+}
+.live-user {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--text-faint);
+}
+
+/* ---- KPI 卡片（终端面板风） ---- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 0.4rem 0 0.8rem 0;
+}
+.kpi {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.05rem 1.2rem 1.2rem 1.2rem;
+    overflow: hidden;
+}
+.kpi::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, var(--kpi-color), transparent 75%);
+}
+.kpi::after {
+    content: "";
+    position: absolute;
+    right: 14px; top: 12px;
+    width: 7px; height: 7px;
+    border: 1px solid var(--kpi-color);
+    transform: rotate(45deg);
+    opacity: 0.55;
+}
+.kpi-label {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.kpi-value {
+    font-family: var(--mono);
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 0.35rem;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.kpi-accent  {--kpi-color: var(--accent);}
+.kpi-green   {--kpi-color: var(--green);}
+.kpi-amber   {--kpi-color: var(--amber);}
+.kpi-purple  {--kpi-color: var(--purple);}
+
+/* ---- 卡片化容器（图表 / 明细面板） ---- */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--card);
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+[data-testid="stVerticalBlockBorderWrapper"] > div {background: transparent;}
+
+/* ---- 面板标题 ---- */
+.chart-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0.4rem 0 0.3rem 0;
+}
+.chart-title::before {content: "// "; color: var(--accent);}
+
+/* ---- 按钮 ---- */
+.stButton > button {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    letter-spacing: 0.05em;
+    transition: all 0.18s ease;
+}
+.stButton > button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ---- 分段控件（时间预设） ---- */
+[data-testid="stSegmentedControl"] {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+}
+[data-testid="stSegmentedControl"] label span {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+}
+
+/* ---- 侧边栏控件文字 ---- */
+[data-testid="stSidebar"] label p,
+[data-testid="stSidebar"] [data-baseweb="select"] div {
+    font-size: 0.78rem;
+}
+
+/* ---- 数据表 ---- */
+[data-testid="stDataFrame"] {border-radius: 8px; overflow: hidden;}
+
+/* ---- Tabs（备用样式） ---- */
+.stTabs [data-baseweb="tab-list"] {gap: 2px; border-bottom: 1px solid var(--border);}
+.stTabs [data-baseweb="tab"] {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+.stTabs [aria-selected="true"] {color: var(--accent);}
+
+/* ---- 登录页文字 ---- */
+.login-title {
+    font-family: var(--mono);
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    margin: 0.4rem 0 0.2rem 0;
+    letter-spacing: 0.02em;
+}
+.login-title::before {content: "> "; color: var(--accent);}
+.login-subtitle {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    text-align: center;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 1.4rem;
+}
+</style>
+"""
+
+st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
+
+
+# ============ 深色终端美学 · 登录页 ============
+LOGIN_CSS = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background-color: #0A0E17;
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        radial-gradient(circle at 50% 12%, rgba(34, 211, 238, 0.12), transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(74, 222, 128, 0.07), transparent 40%),
+        radial-gradient(circle at 10% 80%, rgba(192, 132, 252, 0.08), transparent 38%);
+    background-size: 32px 32px, 32px 32px, auto, auto, auto;
+}
+[data-testid="stHeader"] {display: none;}
+[data-testid="stToolbar"] {display: none;}
+div.block-container {padding-top: 4.5rem !important;}
+.stForm {
+    background: var(--card, rgba(16, 24, 42, 0.85));
+    border: 1px solid var(--border, rgba(148, 163, 184, 0.18));
+    border-radius: 12px;
+    padding: 2.4rem 2.8rem;
+    box-shadow: 0 0 50px rgba(34, 211, 238, 0.07), 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.stForm [data-testid="stTextInput"] input {
+    background: rgba(10, 14, 23, 0.8);
+    border: 1px solid var(--border, rgba(148, 163, 184, 0.2));
+    border-radius: 8px;
+    color: var(--text, #E2E8F0);
+    font-family: var(--mono, monospace);
+}
+.stForm [data-testid="stFormSubmitButton"] button {
+    background: linear-gradient(135deg, #0891B2 0%, #06B6D4 60%, #22D3EE 100%);
+    border: none;
+    border-radius: 8px;
+    color: #04121A;
+    font-family: var(--mono, monospace);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    font-size: 0.82rem;
+}
+.stForm [data-testid="stFormSubmitButton"] button:hover {
+    box-shadow: 0 0 22px rgba(34, 211, 238, 0.4);
+}
+.stForm [data-testid="stCheckbox"] label p {font-size: 0.78rem;}
+</style>
+"""
 
 
 # 登录界面
 def login_page():
-    # 使用 st.columns 创建居中布局
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.markdown(LOGIN_CSS, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown('<div class="platform-icon">🤖</div>', unsafe_allow_html=True)
         st.markdown('<h1 class="login-title">AI代码审查平台</h1>', unsafe_allow_html=True)
-
-        # 如果用户名和密码都为 'admin'，提示用户修改密码
-        if DASHBOARD_USER == "admin" and DASHBOARD_PASSWORD == "admin":
-            st.warning(
-                "安全提示：检测到默认用户名和密码为 'admin'，存在安全风险！\n\n"
-                "请立即修改：\n"
-                "1. 打开 `.env` 文件\n"
-                "2. 修改 `DASHBOARD_USER` 和 `DASHBOARD_PASSWORD` 变量\n"
-                "3. 保存并重启应用"
-            )
-            st.write(f"当前用户名: `{DASHBOARD_USER}`, 当前密码: `{DASHBOARD_PASSWORD}`")
+        st.markdown('<p class="login-subtitle">REVIEW DASHBOARD</p>', unsafe_allow_html=True)
 
         # 获取保存的用户名和密码
         saved_username, saved_password = get_saved_credentials()
 
         # 创建一个form，支持回车提交
         with st.form("login_form", clear_on_submit=False):
-            username = st.text_input("👤 用户名", value=saved_username)
-            password = st.text_input("🔑 密码", type="password", value=saved_password)
+            username = st.text_input("用户名", value=saved_username)
+            password = st.text_input("密码", type="password", value=saved_password)
             remember_password = st.checkbox("记住密码", value=bool(saved_username))
-            submit = st.form_submit_button("登 录")
+            submit = st.form_submit_button("登 录", use_container_width=True)
 
             if submit:
                 if authenticate(username, password, remember_password):
                     st.rerun()  # 重新运行应用以显示主要内容
                 else:
                     st.error("用户名或密码错误")
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
-# 单列展示用较小画布，便于一行多图
-_DEFAULT_CHART_FIGSIZE = (3.8, 3.2)
-_DEFAULT_XTICK_FONT = 8
+# 渲染时间范围筛选（预设按钮 + 日期选择联动，侧边栏紧凑版）
+def render_date_filter(tab_key):
+    presets = {"近7天": 7, "近30天": 30, "近90天": 90, "全部": None}
+    preset = st.segmented_control(
+        "时间范围", list(presets.keys()), default="近7天", key=f"{tab_key}_preset"
+    )
+
+    # 预设变化时重置日期选择，让默认日期跟随预设
+    last_preset = st.session_state.get(f"{tab_key}_last_preset")
+    if last_preset is not None and last_preset != preset:
+        for k in (f"{tab_key}_start", f"{tab_key}_end"):
+            st.session_state.pop(k, None)
+        st.session_state[f"{tab_key}_last_preset"] = preset
+        st.rerun()
+    st.session_state[f"{tab_key}_last_preset"] = preset
+
+    current_date = datetime.date.today()
+    days = presets[preset]
+    if days is None:
+        return None, None
+
+    default_start = current_date - datetime.timedelta(days=days)
+    c1, c2 = st.columns(2)
+    start_date = c1.date_input("开始", value=default_start, key=f"{tab_key}_start")
+    end_date = c2.date_input("结束", value=current_date, key=f"{tab_key}_end")
+    return start_date, end_date
 
 
-# 生成项目提交数量图表
-def generate_project_count_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
+# 渲染统计图表（Streamlit 原生图表，深色主题配色）
+def render_charts(df):
     if df.empty:
-        st.info("没有数据可供展示")
+        st.info("当前筛选条件下暂无数据")
         return
 
-    # 计算每个项目的提交数量
-    project_counts = df['project_name'].value_counts().reset_index()
-    project_counts.columns = ['project_name', 'count']
+    # 每日审查量趋势
+    daily = df.copy()
+    daily["day"] = pd.to_datetime(daily["updated_at"]).dt.date
+    daily_counts = daily.groupby("day").size()
+    st.markdown('<div class="chart-title">每日审查量趋势</div>', unsafe_allow_html=True)
+    st.line_chart(daily_counts, color="#22D3EE")
 
-    # 生成颜色列表，每个项目一个颜色
-    colors = plt.colormaps['tab20'].resampled(len(project_counts))
+    # 项目提交统计 & 项目平均得分
+    pc = df.groupby("project_name").size().reset_index(name="count").sort_values("count", ascending=True)
+    ps = df.groupby("project_name")["score"].mean().reset_index(name="score").sort_values("score", ascending=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="chart-title">项目提交统计</div>', unsafe_allow_html=True)
+        st.bar_chart(pc, x="project_name", y="count", horizontal=True, color="#22D3EE")
+    with c2:
+        st.markdown('<div class="chart-title">项目平均得分</div>', unsafe_allow_html=True)
+        st.bar_chart(ps, x="project_name", y="score", horizontal=True, color="#4ADE80")
 
-    # 显示提交数量柱状图
-    fig1, ax1 = plt.subplots(figsize=figsize)
-    ax1.bar(
-        project_counts['project_name'],
-        project_counts['count'],
-        color=[colors(i) for i in range(len(project_counts))]
-    )
-    ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig1)
-    plt.close(fig1)
+    # 开发者提交统计 & 开发者平均得分
+    ac = df.groupby("author").size().reset_index(name="count").sort_values("count", ascending=True)
+    as_ = df.groupby("author")["score"].mean().reset_index(name="score").sort_values("score", ascending=True)
+    c3, c4 = st.columns(2)
+    with c3:
+        st.markdown('<div class="chart-title">开发者提交统计</div>', unsafe_allow_html=True)
+        st.bar_chart(ac, x="author", y="count", horizontal=True, color="#FBBF24")
+    with c4:
+        st.markdown('<div class="chart-title">开发者平均得分</div>', unsafe_allow_html=True)
+        st.bar_chart(as_, x="author", y="score", horizontal=True, color="#C084FC")
+
+    # 人员/项目代码变更行数
+    acode = df.groupby("author")[["additions", "deletions"]].sum().reset_index()
+    pcode = df.groupby("project_name")[["additions", "deletions"]].sum().reset_index()
+    c5, c6 = st.columns(2)
+    with c5:
+        st.markdown('<div class="chart-title">人员代码变更行数</div>', unsafe_allow_html=True)
+        st.bar_chart(acode, x="author", y=["additions", "deletions"], horizontal=True,
+                     color=["#4ADE80", "#FB7185"])
+    with c6:
+        st.markdown('<div class="chart-title">项目代码变更行数</div>', unsafe_allow_html=True)
+        st.bar_chart(pcode, x="project_name", y=["additions", "deletions"], horizontal=True,
+                     color=["#4ADE80", "#FB7185"])
 
 
-# 生成项目平均分数图表
-def generate_project_score_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
+# 渲染 KPI 指标卡（自定义 HTML，终端面板风）
+def render_kpis(df):
     if df.empty:
-        st.info("没有数据可供展示")
         return
+    total_records = len(df)
+    average_score = df["score"].mean()
+    project_cnt = df["project_name"].nunique()
+    add_sum = int(df["additions"].sum())
+    del_sum = int(df["deletions"].sum())
 
-    # 计算每个项目的平均分数
-    project_scores = df.groupby('project_name')['score'].mean().reset_index()
-    project_scores.columns = ['project_name', 'average_score']
-
-    # 生成颜色列表，每个项目一个颜色
-    # colors = plt.cm.get_cmap('Accent', len(project_scores))  # 使用'tab20'颜色映射，适合分类数据
-    colors = plt.colormaps['Accent'].resampled(len(project_scores))
-    # 显示平均分数柱状图
-    fig2, ax2 = plt.subplots(figsize=figsize)
-    ax2.bar(
-        project_scores['project_name'],
-        project_scores['average_score'],
-        color=[colors(i) for i in range(len(project_scores))]
+    cards = [
+        ("审查记录数", f"{total_records}", "kpi-accent"),
+        ("平均得分", f"{average_score:.1f}", "kpi-green"),
+        ("涉及项目", f"{project_cnt}", "kpi-amber"),
+        ("代码变更", f"+{add_sum} / -{del_sum}", "kpi-purple"),
+    ]
+    html = "".join(
+        f'<div class="kpi {cls}"><div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value">{value}</div></div>'
+        for label, value, cls in cards
     )
-    ax2.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig2)
-    plt.close(fig2)
-
-
-# 生成人员提交数量图表
-def generate_author_count_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
-    if df.empty:
-        st.info("没有数据可供展示")
-        return
-
-    # 计算每个人员的提交数量
-    author_counts = df['author'].value_counts().reset_index()
-    author_counts.columns = ['author', 'count']
-
-    # 生成颜色列表，每个项目一个颜色
-    colors = plt.colormaps['Paired'].resampled(len(author_counts))
-    # 显示提交数量柱状图
-    fig1, ax1 = plt.subplots(figsize=figsize)
-    ax1.bar(
-        author_counts['author'],
-        author_counts['count'],
-        color=[colors(i) for i in range(len(author_counts))]
-    )
-    ax1.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig1)
-    plt.close(fig1)
-
-
-# 生成人员平均分数图表
-def generate_author_score_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
-    if df.empty:
-        st.info("没有数据可供展示")
-        return
-
-    # 计算每个人员的平均分数
-    author_scores = df.groupby('author')['score'].mean().reset_index()
-    author_scores.columns = ['author', 'average_score']
-
-    # 显示平均分数柱状图
-    fig2, ax2 = plt.subplots(figsize=figsize)
-    # 生成颜色列表，每个项目一个颜色
-    colors = plt.colormaps['Pastel1'].resampled(len(author_scores))
-    ax2.bar(
-        author_scores['author'],
-        author_scores['average_score'],
-        color=[colors(i) for i in range(len(author_scores))]
-    )
-    ax2.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig2)
-    plt.close(fig2)
-
-
-def generate_author_code_line_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
-    if df.empty:
-        st.info("没有数据可供展示")
-        return
-
-    if 'additions' not in df.columns or 'deletions' not in df.columns:
-        st.warning("无法生成代码行数图表：缺少必要的数据列")
-        return
-
-    author_code_lines_add = df.groupby('author')['additions'].sum().reset_index()
-    author_code_lines_add.columns = ['author', 'additions']
-    author_code_lines_del = df.groupby('author')['deletions'].sum().reset_index()
-    author_code_lines_del.columns = ['author', 'deletions']
-    fig3, ax3 = plt.subplots(figsize=figsize)
-    ax3.bar(
-        author_code_lines_add['author'],
-        author_code_lines_add['additions'],
-        color=(0.7, 1, 0.7)
-    )
-    ax3.bar(
-        author_code_lines_del['author'],
-        -author_code_lines_del['deletions'],
-        color=(1, 0.7, 0.7)
-    )
-    ax3.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig3)
-    plt.close(fig3)
-
-
-def generate_project_code_line_chart(df, figsize=_DEFAULT_CHART_FIGSIZE, xtick_fs=_DEFAULT_XTICK_FONT):
-    """按项目汇总增删行数，展示形式与 generate_author_code_line_chart 一致（绿色柱为新增，红色柱为删减为负轴）"""
-    if df.empty:
-        st.info("没有数据可供展示")
-        return
-
-    if 'additions' not in df.columns or 'deletions' not in df.columns:
-        st.warning("无法生成项目代码行数图表：缺少必要的数据列")
-        return
-
-    proj_add = df.groupby('project_name')['additions'].sum().reset_index()
-    proj_add.columns = ['project_name', 'additions']
-    proj_del = df.groupby('project_name')['deletions'].sum().reset_index()
-    proj_del.columns = ['project_name', 'deletions']
-
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.bar(
-        proj_add['project_name'],
-        proj_add['additions'],
-        color=(0.7, 1, 0.7),
-    )
-    ax.bar(
-        proj_del['project_name'],
-        -proj_del['deletions'],
-        color=(1, 0.7, 0.7),
-    )
-    ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
-    plt.xticks(rotation=45, ha='right', fontsize=xtick_fs)
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
+    st.markdown(f'<div class="kpi-grid">{html}</div>', unsafe_allow_html=True)
 
 
 # 退出登录函数
@@ -523,115 +639,32 @@ def logout():
     st.rerun()
 
 
-# Pro 版文档链接（登录后展示）
-PRO_VERSION_URL = "https://github.com/sunmh207/AI-Codereview-Gitlab/blob/main/doc/pro.md"
-
-
-# 主要内容
 def main_page():
-    # 顶部导航：一行内标题 + 退出 / Pro（减少垂直留白）
-    head_left, head_right = st.columns([7.2, 2.8])
+    # ---- 顶部：标题 + LIVE 状态 + 退出登录 ----
+    head_left, head_right = st.columns([7, 3])
     with head_left:
         st.markdown(
-            '<style>.dash-heading-bar{margin:0 0 0.15rem 0;padding:0;line-height:1.2;} '
-            '.dash-heading-bar h4{margin:0;font-size:1rem;font-weight:600;}</style>'
-            '<div class="dash-heading-bar"><h4>📊 代码审查统计</h4></div>',
+            '<div class="dash-heading-bar"><h4>代码审查统计</h4></div>'
+            '<div class="dash-subtitle"><b>AI REVIEW</b> &nbsp;·&nbsp; MR / PUSH DASHBOARD</div>',
             unsafe_allow_html=True,
         )
     with head_right:
-        # 两列分别放退出登录、Pro 版，靠右对齐
-        sub_col_logout, sub_col_pro = st.columns([1.3, 1.5])
-        with sub_col_logout:
+        top_status, top_btn = st.columns([1.6, 1.4])
+        with top_status:
+            username = st.session_state.get('username', '')
+            st.markdown(
+                f'<div class="live-wrap"><span class="live-dot"></span>'
+                f'<span class="live-label">LIVE</span>'
+                f'<span class="live-user">{username}</span></div>',
+                unsafe_allow_html=True,
+            )
+        with top_btn:
             if st.button("退出登录", key="logout_button", use_container_width=True):
                 logout()
-        with sub_col_pro:
-            st.markdown(
-                '<div class="pro-link-wrap">'
-                '<a href="' + PRO_VERSION_URL + '" target="_blank" rel="noopener noreferrer" class="pro-link">开源版 VS Pro 版</a>'
-                '</div>',
-                unsafe_allow_html=True
-            )
 
-    current_date = datetime.date.today()
-    start_date_default = current_date - datetime.timedelta(days=7)
-
-    # 根据环境变量决定是否显示 push_tab
-    show_push_tab = os.environ.get('PUSH_REVIEW_ENABLED', '0') == '1'
-
-    if show_push_tab:
-        mr_tab, push_tab = st.tabs(["合并请求", "代码推送"])
-    else:
-        mr_tab = st.container()
-
-    def display_data(tab, service_func, columns, column_config):
-        with tab:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                start_date = st.date_input("开始日期", start_date_default, key=f"{tab}_start_date")
-            with col2:
-                end_date = st.date_input("结束日期", current_date, key=f"{tab}_end_date")
-
-            start_datetime = datetime.datetime.combine(start_date, datetime.time.min)
-            end_datetime = datetime.datetime.combine(end_date, datetime.time.max)
-
-            data = get_data(service_func, updated_at_gte=int(start_datetime.timestamp()),
-                            updated_at_lte=int(end_datetime.timestamp()), columns=columns)
-            df = pd.DataFrame(data)
-
-            unique_authors = sorted(df["author"].dropna().unique().tolist()) if not df.empty else []
-            unique_projects = sorted(df["project_name"].dropna().unique().tolist()) if not df.empty else []
-            with col3:
-                authors = st.multiselect("开发者", unique_authors, default=[], key=f"{tab}_authors")
-            with col4:
-                project_names = st.multiselect("项目名称", unique_projects, default=[], key=f"{tab}_projects")
-
-            data = get_data(service_func, authors=authors, project_names=project_names,
-                            updated_at_gte=int(start_datetime.timestamp()),
-                            updated_at_lte=int(end_datetime.timestamp()), columns=columns)
-            df = pd.DataFrame(data)
-
-            st.data_editor(
-                df,
-                use_container_width=True,
-                column_config=column_config
-            )
-
-            total_records = len(df)
-            average_score = df["score"].mean() if not df.empty else 0
-            st.markdown(f"**总记录数:** {total_records}，**平均得分:** {average_score:.2f}")
-
-            # 所有统计图同一行排列（画布与坐标轴字号收窄以适配宽幅多列）
-            chart_title_css = "<div style='text-align:center;font-size:clamp(11px,0.95vw,14px);line-height:1.2;margin:0 0 0.2rem 0;'><b>{}</b></div>"
-            c1, c2, c3, c4, c5, c6 = st.columns(6)
-            with c1:
-                st.markdown(chart_title_css.format("项目提交统计"), unsafe_allow_html=True)
-                generate_project_count_chart(df)
-            with c2:
-                st.markdown(chart_title_css.format("项目平均得分"), unsafe_allow_html=True)
-                generate_project_score_chart(df)
-            with c3:
-                st.markdown(chart_title_css.format("开发者提交统计"), unsafe_allow_html=True)
-                generate_author_count_chart(df)
-            with c4:
-                st.markdown(chart_title_css.format("开发者平均得分"), unsafe_allow_html=True)
-                generate_author_score_chart(df)
-            with c5:
-                st.markdown(chart_title_css.format("人员代码变更行数"), unsafe_allow_html=True)
-                if 'additions' in df.columns and 'deletions' in df.columns:
-                    generate_author_code_line_chart(df)
-                else:
-                    st.info("无法显示代码行数图表：缺少必要的数据列")
-            with c6:
-                st.markdown(chart_title_css.format("项目代码变更行数"), unsafe_allow_html=True)
-                if 'additions' in df.columns and 'deletions' in df.columns:
-                    generate_project_code_line_chart(df)
-                else:
-                    st.info("无法显示代码行数图表：缺少必要的数据列")
-
-    # Merge Request 数据展示
+    # ---- 数据源定义 ----
     mr_columns = ["project_name", "author", "source_branch", "target_branch", "updated_at", "commit_messages", "delta",
-                  "score",
-                  "url", 'additions', 'deletions']
+                  "score", "url", 'additions', 'deletions']
 
     mr_column_config = {
         "project_name": "项目名称",
@@ -641,46 +674,89 @@ def main_page():
         "updated_at": "更新时间",
         "commit_messages": "提交信息",
         "delta": "代码变更",
-        "score": st.column_config.ProgressColumn(
-            "得分",
-            format="%f",
-            min_value=0,
-            max_value=100,
+        "score": st.column_config.NumberColumn(
+            "得分", format="%d", min_value=0, max_value=100,
         ),
-        "url": st.column_config.LinkColumn(
-            "操作",
-            max_chars=100,
-            display_text="查看详情"
+        "url": st.column_config.LinkColumn("操作", max_chars=100, display_text="查看详情"),
+        "additions": None,
+        "deletions": None,
+    }
+
+    push_columns = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
+                    'additions', 'deletions']
+
+    push_column_config = {
+        "project_name": "项目名称",
+        "author": "开发者",
+        "branch": "分支",
+        "updated_at": "更新时间",
+        "commit_messages": "提交信息",
+        "delta": "代码变更",
+        "score": st.column_config.NumberColumn(
+            "得分", format="%d", min_value=0, max_value=100,
         ),
         "additions": None,
         "deletions": None,
     }
 
-    display_data(mr_tab, ReviewService().get_mr_review_logs, mr_columns, mr_column_config)
+    show_push_tab = os.environ.get('PUSH_REVIEW_ENABLED', '0') == '1'
 
-    # Push 数据展示
-    if show_push_tab:
-        push_columns = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
-                        'additions', 'deletions']
+    # ---- 侧边栏：视图切换 + 筛选 ----
+    with st.sidebar:
+        st.markdown('<div class="side-label">View</div>', unsafe_allow_html=True)
+        if show_push_tab:
+            view = st.radio("数据源", ["合并请求", "代码推送"], label_visibility="collapsed")
+        else:
+            view = "合并请求"
 
-        push_column_config = {
-            "project_name": "项目名称",
-            "author": "开发者",
-            "branch": "分支",
-            "updated_at": "更新时间",
-            "commit_messages": "提交信息",
-            "delta": "代码变更",
-            "score": st.column_config.ProgressColumn(
-                "得分",
-                format="%f",
-                min_value=0,
-                max_value=100,
-            ),
-            "additions": None,
-            "deletions": None,
-        }
+        tab_key = "push" if view == "代码推送" else "mr"
+        service_func = (ReviewService().get_push_review_logs if view == "代码推送"
+                        else ReviewService().get_mr_review_logs)
+        columns = push_columns if view == "代码推送" else mr_columns
+        column_config = push_column_config if view == "代码推送" else mr_column_config
 
-        display_data(push_tab, ReviewService().get_push_review_logs, push_columns, push_column_config)
+        st.markdown('<div class="side-label">Filter</div>', unsafe_allow_html=True)
+        start_date, end_date = render_date_filter(tab_key)
+
+        start_datetime = (int(datetime.datetime.combine(start_date, datetime.time.min).timestamp())
+                          if start_date else None)
+        end_datetime = (int(datetime.datetime.combine(end_date, datetime.time.max).timestamp())
+                        if end_date else None)
+
+        # 先按时间范围查一次，用于构建作者/项目选项
+        base = get_data(service_func, updated_at_gte=start_datetime,
+                        updated_at_lte=end_datetime, columns=columns)
+        df_base = pd.DataFrame(base)
+        unique_authors = (sorted(df_base["author"].dropna().unique().tolist()) if not df_base.empty else [])
+        unique_projects = (sorted(df_base["project_name"].dropna().unique().tolist()) if not df_base.empty else [])
+
+        authors = st.multiselect("开发者", unique_authors, default=[], key=f"{tab_key}_authors")
+        project_names = st.multiselect("项目名称", unique_projects, default=[], key=f"{tab_key}_projects")
+
+        st.markdown('<div class="side-version">AI-Codereview-Gitlab · v1</div>', unsafe_allow_html=True)
+
+    # ---- 主区内容 ----
+    data = get_data(service_func, authors=authors, project_names=project_names,
+                    updated_at_gte=start_datetime, updated_at_lte=end_datetime, columns=columns)
+    df = pd.DataFrame(data)
+
+    # KPI 指标
+    render_kpis(df)
+
+    # 统计图表
+    with st.container(border=True):
+        st.markdown('<div class="chart-title">统计图表</div>', unsafe_allow_html=True)
+        render_charts(df)
+
+    # 数据明细
+    with st.container(border=True):
+        st.markdown('<div class="chart-title">数据明细</div>', unsafe_allow_html=True)
+        st.data_editor(
+            df,
+            use_container_width=True,
+            column_config=column_config,
+            hide_index=True,
+        )
 
 
 # 应用入口
