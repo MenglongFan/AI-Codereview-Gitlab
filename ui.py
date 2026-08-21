@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 import math
 
-import altair as alt
-import pandas as pd
-import streamlit as st
-
-# 设置Streamlit主题 - 必须是第一个st命令
-st.set_page_config(layout="wide", page_title="AI代码审查平台", initial_sidebar_state="expanded")
-
 import datetime
 import os
 import hashlib
 import hmac
 import base64
 import time
+
+import altair as alt
 import pandas as pd
-from dotenv import load_dotenv
 import streamlit as st
+from dotenv import load_dotenv
 
 from biz.service.review_service import ReviewService
 from streamlit_cookies_manager import CookieManager
+
+# 设置Streamlit主题 - 必须是第一个st命令
+st.set_page_config(layout="wide", page_title="AI代码审查平台", initial_sidebar_state="expanded")
 
 load_dotenv("conf/.env")
 
@@ -449,8 +447,6 @@ div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !imp
 </style>
 """
 
-st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
-
 
 # ============ 深色终端美学 · 登录页 ============
 LOGIN_CSS = """
@@ -502,6 +498,7 @@ div.block-container {padding-top: 4.5rem !important;}
 
 # 登录界面
 def login_page():
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     st.markdown(LOGIN_CSS, unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
@@ -672,6 +669,7 @@ def render_kpis(df):
 # 渲染 Token 消耗统计（KPI + 聚合图，随侧边栏筛选联动）
 def render_token_stats(df):
     if df.empty or "total_tokens" not in df.columns:
+        st.info("当前筛选条件下暂无数据")
         return
 
     total = int(df["total_tokens"].sum())
@@ -727,9 +725,11 @@ def render_token_stats(df):
 
 
 # 渲染工作日报的 Token 消耗（独立归类，与 review 统计分开）
-def render_daily_report_stats():
+def render_daily_report_stats(updated_at_gte=None, updated_at_lte=None):
     try:
-        rdf = ReviewService().get_daily_report_logs()
+        rdf = ReviewService().get_daily_report_logs(
+            updated_at_gte=updated_at_gte, updated_at_lte=updated_at_lte
+        )
     except Exception:
         return
     if rdf.empty or "total_tokens" not in rdf.columns:
@@ -782,13 +782,60 @@ def logout():
     st.rerun()
 
 
-def main_page():
-    # ---- 顶部：标题 + LIVE 状态 + 退出登录 ----
+# ============ 页面配置常量 ============
+# 审查页明细列（不含 token 列；token 相关已移入 Token 统计页）
+MR_COLUMNS = ["project_name", "author", "source_branch", "target_branch", "updated_at", "commit_messages", "delta",
+              "score", "url", "additions", "deletions"]
+
+MR_COLUMN_CONFIG = {
+    "project_name": "项目名称",
+    "author": "开发者",
+    "source_branch": "源分支",
+    "target_branch": "目标分支",
+    "updated_at": "更新时间",
+    "commit_messages": "提交信息",
+    "delta": "代码变更",
+    "score": st.column_config.NumberColumn(
+        "得分", format="%d", min_value=0, max_value=100,
+    ),
+    "url": st.column_config.LinkColumn("操作", max_chars=100, display_text="查看详情"),
+    "additions": None,
+    "deletions": None,
+}
+
+PUSH_COLUMNS = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
+                "additions", "deletions"]
+
+PUSH_COLUMN_CONFIG = {
+    "project_name": "项目名称",
+    "author": "开发者",
+    "branch": "分支",
+    "updated_at": "更新时间",
+    "commit_messages": "提交信息",
+    "delta": "代码变更",
+    "score": st.column_config.NumberColumn(
+        "得分", format="%d", min_value=0, max_value=100,
+    ),
+    "additions": None,
+    "deletions": None,
+}
+
+# Token 统计页所需的审查记录列
+TOKEN_COLUMNS = ["project_name", "author", "updated_at", "prompt_tokens", "completion_tokens", "total_tokens"]
+
+
+def push_review_enabled():
+    return os.environ.get('PUSH_REVIEW_ENABLED', '0') == '1'
+
+
+# ============ 顶部标题栏（各页面共用） ============
+def render_header(title, subtitle, logout_key="logout_button"):
+    st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
     head_left, head_right = st.columns([7, 3])
     with head_left:
         st.markdown(
-            '<div class="dash-heading-bar"><h4>代码审查统计</h4></div>'
-            '<div class="dash-subtitle"><b>AI REVIEW</b> &nbsp;·&nbsp; MR / PUSH DASHBOARD</div>',
+            f'<div class="dash-heading-bar"><h4>{title}</h4></div>'
+            f'<div class="dash-subtitle">{subtitle}</div>',
             unsafe_allow_html=True,
         )
     with head_right:
@@ -802,70 +849,15 @@ def main_page():
                 unsafe_allow_html=True,
             )
         with top_btn:
-            if st.button("退出登录", key="logout_button", use_container_width=True):
+            if st.button("退出登录", key=logout_key, use_container_width=True):
                 logout()
 
-    # ---- 数据源定义 ----
-    mr_columns = ["project_name", "author", "source_branch", "target_branch", "updated_at", "commit_messages", "delta",
-                  "score", "url", 'additions', 'deletions',
-                  "prompt_tokens", "completion_tokens", "total_tokens"]
 
-    mr_column_config = {
-        "project_name": "项目名称",
-        "author": "开发者",
-        "source_branch": "源分支",
-        "target_branch": "目标分支",
-        "updated_at": "更新时间",
-        "commit_messages": "提交信息",
-        "delta": "代码变更",
-        "score": st.column_config.NumberColumn(
-            "得分", format="%d", min_value=0, max_value=100,
-        ),
-        "url": st.column_config.LinkColumn("操作", max_chars=100, display_text="查看详情"),
-        "additions": None,
-        "deletions": None,
-        "prompt_tokens": st.column_config.NumberColumn("Prompt", format="%d"),
-        "completion_tokens": st.column_config.NumberColumn("Completion", format="%d"),
-        "total_tokens": st.column_config.NumberColumn("Tokens", format="%d"),
-    }
+# ============ 审查统计页（MR / Push 共用渲染逻辑） ============
+def render_review_page(service_func, columns, column_config, tab_key, title, subtitle):
+    render_header(title, subtitle, logout_key=f"logout_{tab_key}")
 
-    push_columns = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
-                    'additions', 'deletions',
-                    "prompt_tokens", "completion_tokens", "total_tokens"]
-
-    push_column_config = {
-        "project_name": "项目名称",
-        "author": "开发者",
-        "branch": "分支",
-        "updated_at": "更新时间",
-        "commit_messages": "提交信息",
-        "delta": "代码变更",
-        "score": st.column_config.NumberColumn(
-            "得分", format="%d", min_value=0, max_value=100,
-        ),
-        "additions": None,
-        "deletions": None,
-        "prompt_tokens": st.column_config.NumberColumn("Prompt", format="%d"),
-        "completion_tokens": st.column_config.NumberColumn("Completion", format="%d"),
-        "total_tokens": st.column_config.NumberColumn("Tokens", format="%d"),
-    }
-
-    show_push_tab = os.environ.get('PUSH_REVIEW_ENABLED', '0') == '1'
-
-    # ---- 侧边栏：视图切换 + 筛选 ----
     with st.sidebar:
-        st.markdown('<div class="side-label">View</div>', unsafe_allow_html=True)
-        if show_push_tab:
-            view = st.radio("数据源", ["合并请求", "代码推送"], label_visibility="collapsed")
-        else:
-            view = "合并请求"
-
-        tab_key = "push" if view == "代码推送" else "mr"
-        service_func = (ReviewService().get_push_review_logs if view == "代码推送"
-                        else ReviewService().get_mr_review_logs)
-        columns = push_columns if view == "代码推送" else mr_columns
-        column_config = push_column_config if view == "代码推送" else mr_column_config
-
         st.markdown('<div class="side-label">Filter</div>', unsafe_allow_html=True)
         start_date, end_date = render_date_filter(tab_key)
 
@@ -894,25 +886,12 @@ def main_page():
     # KPI 指标
     render_kpis(df)
 
-    # Token 消耗统计（明细聚合，随筛选联动）
-    if not df.empty:
-        st.divider()
-        with st.container(border=True):
-            st.markdown('<div class="chart-title">Token 消耗统计</div>', unsafe_allow_html=True)
-            render_token_stats(df)
-
     # 统计图表
     with st.container(border=True):
         st.markdown('<div class="chart-title">统计图表</div>', unsafe_allow_html=True)
         render_charts(df)
 
-    # 工作日报 Token 消耗（独立归类）
-    st.divider()
-    with st.container(border=True):
-        st.markdown('<div class="chart-title">日报 Token 消耗</div>', unsafe_allow_html=True)
-        render_daily_report_stats()
-
-    # 数据明细
+    # 数据明细（已去掉 token 列，token 明细见 Token 统计页）
     with st.container(border=True):
         st.markdown('<div class="chart-title">数据明细</div>', unsafe_allow_html=True)
         st.data_editor(
@@ -923,8 +902,120 @@ def main_page():
         )
 
 
-# 应用入口
-if check_login_status():
-    main_page()
-else:
+def render_mr_review_page():
+    render_review_page(ReviewService().get_mr_review_logs, MR_COLUMNS, MR_COLUMN_CONFIG,
+                       "mr", "MR 审查", "AI REVIEW · MERGE REQUEST")
+
+
+def render_push_review_page():
+    render_review_page(ReviewService().get_push_review_logs, PUSH_COLUMNS, PUSH_COLUMN_CONFIG,
+                       "push", "Push 审查", "AI REVIEW · PUSH")
+
+
+# ============ Token 统计页 ============
+def load_review_tokens(authors=None, project_names=None, updated_at_gte=None, updated_at_lte=None):
+    """合并 MR + Push 的审查 token 数据，附带来源列用于下钻。"""
+    sources = [("MR", ReviewService().get_mr_review_logs)]
+    if push_review_enabled():
+        sources.append(("Push", ReviewService().get_push_review_logs))
+
+    frames = []
+    for label, func in sources:
+        df = get_data(func, authors=authors, project_names=project_names,
+                      updated_at_gte=updated_at_gte, updated_at_lte=updated_at_lte,
+                      columns=TOKEN_COLUMNS)
+        if df.empty:
+            continue
+        df["来源"] = label
+        frames.append(df)
+
+    if not frames:
+        return pd.DataFrame(columns=TOKEN_COLUMNS + ["来源"])
+    return pd.concat(frames, ignore_index=True)
+
+
+def render_token_page():
+    render_header("Token 统计", "AI REVIEW · TOKEN USAGE", logout_key="logout_token")
+
+    with st.sidebar:
+        st.markdown('<div class="side-label">Filter</div>', unsafe_allow_html=True)
+        start_date, end_date = render_date_filter("token")
+
+        start_datetime = (int(datetime.datetime.combine(start_date, datetime.time.min).timestamp())
+                          if start_date else None)
+        end_datetime = (int(datetime.datetime.combine(end_date, datetime.time.max).timestamp())
+                        if end_date else None)
+
+        # 先按时间范围查一次，用于构建作者/项目选项
+        base = load_review_tokens(updated_at_gte=start_datetime, updated_at_lte=end_datetime)
+        unique_authors = (sorted(base["author"].dropna().unique().tolist()) if not base.empty else [])
+        unique_projects = (sorted(base["project_name"].dropna().unique().tolist()) if not base.empty else [])
+
+        authors = st.multiselect("开发者", unique_authors, default=[], key="token_authors")
+        project_names = st.multiselect("项目名称", unique_projects, default=[], key="token_projects")
+
+        source = "全部"
+        if push_review_enabled():
+            source = st.segmented_control("来源", ["全部", "MR", "Push"], default="全部", key="token_source")
+
+        st.markdown('<div class="side-version">AI-Codereview-Gitlab · v1</div>', unsafe_allow_html=True)
+
+    # ---- 主区内容 ----
+    rdf = load_review_tokens(authors=authors, project_names=project_names,
+                             updated_at_gte=start_datetime, updated_at_lte=end_datetime)
+    if source != "全部":
+        rdf = rdf[rdf["来源"] == source].reset_index(drop=True)
+
+    # 审查 Token（MR + Push 合并，受来源下钻与筛选联动）
+    with st.container(border=True):
+        source_label = "MR + Push" if push_review_enabled() else "MR"
+        st.markdown(f'<div class="chart-title">审查 Token · {source_label}</div>', unsafe_allow_html=True)
+        render_token_stats(rdf)
+
+    # 审查 Token 明细（含 token 列）
+    with st.container(border=True):
+        st.markdown('<div class="chart-title">审查 Token 明细</div>', unsafe_allow_html=True)
+        if rdf.empty:
+            st.info("当前筛选条件下暂无数据")
+        else:
+            detail = rdf[["来源", "project_name", "author", "updated_at",
+                          "prompt_tokens", "completion_tokens", "total_tokens"]].rename(columns={
+                "project_name": "项目",
+                "author": "开发者",
+                "updated_at": "更新时间",
+                "prompt_tokens": "Prompt",
+                "completion_tokens": "Completion",
+                "total_tokens": "Tokens",
+            })
+            st.dataframe(detail, use_container_width=True, hide_index=True)
+
+    # 日报 Token（共用本页时间筛选）
+    st.divider()
+    with st.container(border=True):
+        st.markdown('<div class="chart-title">日报 Token 消耗</div>', unsafe_allow_html=True)
+        render_daily_report_stats(updated_at_gte=start_datetime, updated_at_lte=end_datetime)
+
+
+# ============ 应用入口 ============
+def build_navigation():
+    pages = {
+        "审查统计": [
+            st.Page(render_mr_review_page, title="MR 审查", url_path="mr-review", default=True),
+        ],
+        "Token 统计": [
+            st.Page(render_token_page, title="Token 统计", url_path="token-statistics"),
+        ],
+    }
+    if push_review_enabled():
+        pages["审查统计"].append(
+            st.Page(render_push_review_page, title="Push 审查", url_path="push-review")
+        )
+    return pages
+
+
+if not check_login_status():
     login_page()
+    st.stop()
+
+pg = st.navigation(build_navigation())
+pg.run()
