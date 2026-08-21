@@ -2,6 +2,7 @@
 import math
 
 import altair as alt
+import pandas as pd
 import streamlit as st
 
 # 设置Streamlit主题 - 必须是第一个st命令
@@ -552,7 +553,24 @@ def render_date_filter(tab_key):
     return start_date, end_date
 
 
-# 渲染统计图表（Streamlit 原生图表，深色主题配色）
+def _grouped_change_chart(df, key):
+    """生成人员/项目代码变更行数分组柱状图，X 轴从 0 开始。"""
+    df = df.melt(id_vars=[key], value_vars=["additions", "deletions"], var_name="type", value_name="lines")
+    df["type"] = df["type"].map({"additions": "新增", "deletions": "删除"})
+    xmax = max(df["lines"].max() if not df.empty else 0, 1)
+    color_scale = alt.Scale(domain=["新增", "删除"], range=["#4ADE80", "#FB7185"])
+    return (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusEnd=4)
+        .encode(
+            x=alt.X("lines:Q", scale=alt.Scale(domain=[0, xmax * 1.1]), title="lines"),
+            y=alt.Y(f"{key}:N", sort="x", title=None),
+            color=alt.Color("type:N", scale=color_scale, title=None),
+        )
+    )
+
+
+# 渲染统计图表（统一使用 Altair，固定坐标轴从 0 开始）
 def render_charts(df):
     if df.empty:
         st.info("当前筛选条件下暂无数据")
@@ -561,9 +579,13 @@ def render_charts(df):
     # 每日审查量趋势
     daily = df.copy()
     daily["day"] = pd.to_datetime(daily["updated_at"]).dt.date
-    daily_counts = daily.groupby("day").size()
+    daily_counts = daily.groupby("day").size().reset_index(name="count")
     st.markdown('<div class="chart-title">每日审查量趋势</div>', unsafe_allow_html=True)
-    st.line_chart(daily_counts, color="#22D3EE")
+    chart = alt.Chart(daily_counts).mark_line(color="#22D3EE", strokeWidth=3).encode(
+        x=alt.X("day:T", title=None),
+        y=alt.Y("count:Q", scale=alt.Scale(domain=[0, max(daily_counts["count"].max(), 1) * 1.1]), title="count"),
+    )
+    st.altair_chart(chart, use_container_width=True)
 
     # 项目提交统计 & 项目平均得分
     pc = df.groupby("project_name").size().reset_index(name="count").sort_values("count", ascending=True)
@@ -571,7 +593,12 @@ def render_charts(df):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown('<div class="chart-title">项目提交统计</div>', unsafe_allow_html=True)
-        st.bar_chart(pc, x="project_name", y="count", horizontal=True, color="#22D3EE")
+        pmax = max(pc["count"].max() if not pc.empty else 0, 1)
+        chart = alt.Chart(pc).mark_bar(color="#22D3EE", cornerRadiusEnd=4).encode(
+            x=alt.X("count:Q", scale=alt.Scale(domain=[0, pmax * 1.1]), title="count"),
+            y=alt.Y("project_name:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
     with c2:
         st.markdown('<div class="chart-title">项目平均得分</div>', unsafe_allow_html=True)
         chart = alt.Chart(ps).mark_bar(color="#4ADE80", cornerRadiusEnd=4).encode(
@@ -586,7 +613,12 @@ def render_charts(df):
     c3, c4 = st.columns(2)
     with c3:
         st.markdown('<div class="chart-title">开发者提交统计</div>', unsafe_allow_html=True)
-        st.bar_chart(ac, x="author", y="count", horizontal=True, color="#FBBF24")
+        amax = max(ac["count"].max() if not ac.empty else 0, 1)
+        chart = alt.Chart(ac).mark_bar(color="#FBBF24", cornerRadiusEnd=4).encode(
+            x=alt.X("count:Q", scale=alt.Scale(domain=[0, amax * 1.1]), title="count"),
+            y=alt.Y("author:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
     with c4:
         st.markdown('<div class="chart-title">开发者平均得分</div>', unsafe_allow_html=True)
         chart = alt.Chart(as_).mark_bar(color="#C084FC", cornerRadiusEnd=4).encode(
@@ -601,12 +633,16 @@ def render_charts(df):
     c5, c6 = st.columns(2)
     with c5:
         st.markdown('<div class="chart-title">人员代码变更行数</div>', unsafe_allow_html=True)
-        st.bar_chart(acode, x="author", y=["additions", "deletions"], horizontal=True,
-                     color=["#4ADE80", "#FB7185"])
+        st.altair_chart(
+            _grouped_change_chart(acode, "author"),
+            use_container_width=True,
+        )
     with c6:
         st.markdown('<div class="chart-title">项目代码变更行数</div>', unsafe_allow_html=True)
-        st.bar_chart(pcode, x="project_name", y=["additions", "deletions"], horizontal=True,
-                     color=["#4ADE80", "#FB7185"])
+        st.altair_chart(
+            _grouped_change_chart(pcode, "project_name"),
+            use_container_width=True,
+        )
 
 
 # 渲染 KPI 指标卡（自定义 HTML，终端面板风）
@@ -662,18 +698,32 @@ def render_token_stats(df):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown('<div class="chart-title">Token by Project</div>', unsafe_allow_html=True)
-        st.bar_chart(pt, x="project_name", y="tokens", horizontal=True, color="#22D3EE")
+        pmax = max(pt["tokens"].max() if not pt.empty else 0, 1)
+        chart = alt.Chart(pt).mark_bar(color="#22D3EE", cornerRadiusEnd=4).encode(
+            x=alt.X("tokens:Q", scale=alt.Scale(domain=[0, pmax * 1.1]), title="tokens"),
+            y=alt.Y("project_name:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
     with c2:
         st.markdown('<div class="chart-title">Token by Author</div>', unsafe_allow_html=True)
-        st.bar_chart(at, x="author", y="tokens", horizontal=True, color="#C084FC")
+        amax = max(at["tokens"].max() if not at.empty else 0, 1)
+        chart = alt.Chart(at).mark_bar(color="#C084FC", cornerRadiusEnd=4).encode(
+            x=alt.X("tokens:Q", scale=alt.Scale(domain=[0, amax * 1.1]), title="tokens"),
+            y=alt.Y("author:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
 
     # Token 时间趋势（按天聚合）
     daily = df.copy()
     daily["day"] = pd.to_datetime(daily["updated_at"]).dt.date
-    daily_tokens = daily.groupby("day")["total_tokens"].sum()
+    daily_tokens = daily.groupby("day")["total_tokens"].sum().reset_index(name="tokens")
     st.markdown('<div class="chart-title">Token Trend</div>', unsafe_allow_html=True)
     if len(daily_tokens) > 0:
-        st.area_chart(daily_tokens, color="#22D3EE")
+        chart = alt.Chart(daily_tokens).mark_area(color="#22D3EE", opacity=0.6).encode(
+            x=alt.X("day:T", title=None),
+            y=alt.Y("tokens:Q", scale=alt.Scale(domain=[0, max(daily_tokens["tokens"].max(), 1) * 1.1]), title="tokens"),
+        )
+        st.altair_chart(chart, use_container_width=True)
 
 
 # 渲染工作日报的 Token 消耗（独立归类，与 review 统计分开）
