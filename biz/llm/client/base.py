@@ -15,8 +15,19 @@ class BaseClient:
         self._usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     def _accumulate_usage(self, usage: Optional[Dict] = None) -> None:
-        """Tolerant accumulation: missing / None fields are treated as 0."""
+        """Tolerant accumulation: missing / None fields are treated as 0.
+
+        Accepts both plain dicts and SDK model objects (e.g. openai's
+        CompletionUsage); model objects are converted via model_dump()/dict().
+        """
         u = usage or {}
+        if not isinstance(u, dict):
+            if hasattr(u, "model_dump"):  # pydantic v2
+                u = u.model_dump()
+            elif hasattr(u, "dict"):      # pydantic v1
+                u = u.dict()
+            else:
+                u = {}
         self._usage["prompt_tokens"] += int(u.get("prompt_tokens") or 0)
         self._usage["completion_tokens"] += int(u.get("completion_tokens") or 0)
         self._usage["total_tokens"] += int(u.get("total_tokens") or 0)
