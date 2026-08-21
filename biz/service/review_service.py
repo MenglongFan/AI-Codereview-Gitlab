@@ -45,6 +45,15 @@ class ReviewService:
                             deletions INTEGER DEFAULT 0
                         )
                     ''')
+                cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS daily_report_log (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            report_time INTEGER,
+                            prompt_tokens INTEGER DEFAULT 0,
+                            completion_tokens INTEGER DEFAULT 0,
+                            total_tokens INTEGER DEFAULT 0
+                        )
+                    ''')
                 # 确保旧版本的mr_review_log、push_review_log表添加additions、deletions列
                 tables = ["mr_review_log", "push_review_log"]
                 columns = ["additions", "deletions"]
@@ -52,6 +61,15 @@ class ReviewService:
                     cursor.execute(f"PRAGMA table_info({table})")
                     current_columns = [col[1] for col in cursor.fetchall()]
                     for column in columns:
+                        if column not in current_columns:
+                            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} INTEGER DEFAULT 0")
+
+                # 为两表添加 token 统计列（LLM usage），幂等迁移
+                token_columns = ["prompt_tokens", "completion_tokens", "total_tokens"]
+                for table in tables:
+                    cursor.execute(f"PRAGMA table_info({table})")
+                    current_columns = [col[1] for col in cursor.fetchall()]
+                    for column in token_columns:
                         if column not in current_columns:
                             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} INTEGER DEFAULT 0")
 
@@ -87,13 +105,14 @@ class ReviewService:
                 cursor.execute('''
                                 INSERT INTO mr_review_log (project_name,author, source_branch, target_branch, 
                                 updated_at, commit_messages, score, url,review_result, additions, deletions, 
-                                last_commit_id)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                last_commit_id, prompt_tokens, completion_tokens, total_tokens)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ''',
                                (entity.project_name, entity.author, entity.source_branch,
                                 entity.target_branch, entity.updated_at, entity.commit_messages, entity.score,
                                 entity.url, entity.review_result, entity.additions, entity.deletions,
-                                entity.last_commit_id))
+                                entity.last_commit_id, entity.prompt_tokens, entity.completion_tokens,
+                                entity.total_tokens))
                 conn.commit()
         except sqlite3.DatabaseError as e:
             print(f"Error inserting review log: {e}")
@@ -105,7 +124,7 @@ class ReviewService:
         try:
             with sqlite3.connect(ReviewService.DB_FILE) as conn:
                 query = """
-                            SELECT project_name, author, source_branch, target_branch, updated_at, commit_messages, score, url, review_result, additions, deletions
+                            SELECT project_name, author, source_branch, target_branch, updated_at, commit_messages, score, url, review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens
                             FROM mr_review_log
                             WHERE 1=1
                             """
@@ -158,12 +177,13 @@ class ReviewService:
             with sqlite3.connect(ReviewService.DB_FILE) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                                INSERT INTO push_review_log (project_name,author, branch, updated_at, commit_messages, score,review_result, additions, deletions)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                INSERT INTO push_review_log (project_name,author, branch, updated_at, commit_messages, score,review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ''',
                                (entity.project_name, entity.author, entity.branch,
                                 entity.updated_at, entity.commit_messages, entity.score,
-                                entity.review_result, entity.additions, entity.deletions))
+                                entity.review_result, entity.additions, entity.deletions,
+                                entity.prompt_tokens, entity.completion_tokens, entity.total_tokens))
                 conn.commit()
         except sqlite3.DatabaseError as e:
             print(f"Error inserting review log: {e}")
@@ -176,7 +196,7 @@ class ReviewService:
             with sqlite3.connect(ReviewService.DB_FILE) as conn:
                 # 基础查询
                 query = """
-                    SELECT project_name, author, branch, updated_at, commit_messages, score, review_result, additions, deletions
+                    SELECT project_name, author, branch, updated_at, commit_messages, score, review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens
                     FROM push_review_log
                     WHERE 1=1
                 """
@@ -211,6 +231,40 @@ class ReviewService:
                 return df
         except sqlite3.DatabaseError as e:
             print(f"Error retrieving push review logs: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
+    def insert_daily_report_log(report_time: int, prompt_tokens: int = 0, completion_tokens: int = 0,
+                                total_tokens: int = 0):
+        """插入工作日报的 LLM token 消耗记录"""
+        try:
+            with sqlite3.connect(ReviewService.DB_FILE) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO daily_report_log (report_time, prompt_tokens, completion_tokens, total_tokens)
+                    VALUES (?, ?, ?, ?)
+                ''', (report_time, prompt_tokens, completion_tokens, total_tokens))
+                conn.commit()
+        except sqlite3.DatabaseError as e:
+            print(f"Error inserting daily report log: {e}")
+
+    @staticmethod
+    def get_daily_report_logs(updated_at_gte: int = None, updated_at_lte: int = None) -> pd.DataFrame:
+        """获取工作日报的 token 消耗记录"""
+        try:
+            with sqlite3.connect(ReviewService.DB_FILE) as conn:
+                query = "SELECT report_time, prompt_tokens, completion_tokens, total_tokens FROM daily_report_log WHERE 1=1"
+                params = []
+                if updated_at_gte is not None:
+                    query += " AND report_time >= ?"
+                    params.append(updated_at_gte)
+                if updated_at_lte is not None:
+                    query += " AND report_time <= ?"
+                    params.append(updated_at_lte)
+                query += " ORDER BY report_time DESC"
+                return pd.read_sql_query(sql=query, con=conn, params=params)
+        except sqlite3.DatabaseError as e:
+            print(f"Error retrieving daily report logs: {e}")
             return pd.DataFrame()
 
 

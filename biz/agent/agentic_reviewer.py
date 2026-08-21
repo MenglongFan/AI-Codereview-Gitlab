@@ -103,12 +103,30 @@ class AgenticReviewer:
         self.adapter = adapter
         self.max_iterations = max_iterations
         self.total_token_cap = total_token_cap
+        self._built_adapter: LLMAdapter | None = None
+        self._fallback_reviewer: CodeReviewer | None = None
 
     def _build_adapter(self) -> LLMAdapter:
         if self.adapter is not None:
+            self._built_adapter = self.adapter
             return self.adapter
         client = Factory().getClient()
-        return LLMAdapter(client)
+        self._built_adapter = LLMAdapter(client)
+        return self._built_adapter
+
+    def _fallback_review(self, diffs_text: str, commits_text: str) -> str:
+        """diff_only fallback shared by all degrade paths; keeps the reviewer
+        around so its token usage can be reported via get_usage()."""
+        self._fallback_reviewer = CodeReviewer()
+        return self._fallback_reviewer.review_and_strip_code(diffs_text, commits_text)
+
+    def get_usage(self) -> dict:
+        """Return accumulated token usage of this review (agentic or fallback)."""
+        if self._fallback_reviewer is not None:
+            return self._fallback_reviewer.get_usage()
+        if self._built_adapter is not None:
+            return self._built_adapter.client.get_usage()
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     def _build_registry(self, repo_root: Path) -> ToolRegistry:
         registry = ToolRegistry()
@@ -130,7 +148,7 @@ class AgenticReviewer:
         except Exception as e:
             logger.error("agentic repo sync failed, degrading: %s", e)
             notifier.send_notification(content=f"[agentic] repo sync failed: {e}; falling back to diff_only")
-            return CodeReviewer().review_and_strip_code(diffs_text, commits_text)
+            return self._fallback_review(diffs_text, commits_text)
 
         # 2. Build adapter, registry, runner.
         adapter = self._build_adapter()

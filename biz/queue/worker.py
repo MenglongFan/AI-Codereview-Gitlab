@@ -61,18 +61,26 @@ def _resolve_repo_for_event(webhook_data: dict, gitlab_url: str = "") -> tuple[s
     return None, None, None
 
 
-def _review_with_strategy(changes: list, commits_text: str, webhook_data: dict, gitlab_url: str) -> str:
-    """Pick review strategy based on REVIEW_STRATEGY env var."""
+def _review_with_strategy(changes: list, commits_text: str, webhook_data: dict, gitlab_url: str) -> tuple[str, dict]:
+    """Pick review strategy based on REVIEW_STRATEGY env var.
+
+    Returns (review_result, usage_dict) where usage_dict holds the
+    prompt/completion/total tokens accumulated by the LLM client.
+    """
     strategy = os.getenv("REVIEW_STRATEGY", "diff_only")
     if strategy != "agentic":
-        return CodeReviewer().review_and_strip_code(str(changes), commits_text)
+        reviewer = CodeReviewer()
+        result = reviewer.review_and_strip_code(str(changes), commits_text)
+        return result, reviewer.get_usage()
 
     # Agentic mode.
     from biz.agent.agentic_reviewer import AgenticReviewer
     repo_url, repo_key, ref = _resolve_repo_for_event(webhook_data, gitlab_url)
     if not (repo_url and repo_key and ref):
         logger.warning("could not resolve repo info for agentic mode, falling back to diff_only")
-        return CodeReviewer().review_and_strip_code(str(changes), commits_text)
+        reviewer = CodeReviewer()
+        result = reviewer.review_and_strip_code(str(changes), commits_text)
+        return result, reviewer.get_usage()
     cache_root = os.getenv("REPO_CACHE_DIR", "data/repo_cache")
     try:
         reviewer = AgenticReviewer(
@@ -81,10 +89,13 @@ def _review_with_strategy(changes: list, commits_text: str, webhook_data: dict, 
             ref=ref,
             cache_root=cache_root,
         )
-        return reviewer.review(diffs_text=str(changes), commits_text=commits_text)
+        result = reviewer.review(diffs_text=str(changes), commits_text=commits_text)
+        return result, reviewer.get_usage()
     except Exception as e:
         logger.error("agentic reviewer raised unexpectedly, falling back: %s", e)
-        return CodeReviewer().review_and_strip_code(str(changes), commits_text)
+        reviewer = CodeReviewer()
+        result = reviewer.review_and_strip_code(str(changes), commits_text)
+        return result, reviewer.get_usage()
 
 
 def handle_push_event(webhook_data: dict, gitlab_token: str, gitlab_url: str, gitlab_url_slug: str):
@@ -101,6 +112,7 @@ def handle_push_event(webhook_data: dict, gitlab_token: str, gitlab_url: str, gi
         score = 0
         additions = 0
         deletions = 0
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         if push_review_enabled:
             # 获取PUSH的changes
             changes = handler.get_push_changes()
@@ -112,7 +124,7 @@ def handle_push_event(webhook_data: dict, gitlab_token: str, gitlab_url: str, gi
 
             if len(changes) > 0:
                 commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-                review_result = _review_with_strategy(changes, commits_text, webhook_data, gitlab_url)
+                review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, gitlab_url)
                 score = CodeReviewer.parse_review_score(review_text=review_result)
                 for item in changes:
                     additions += item['additions']
@@ -132,6 +144,9 @@ def handle_push_event(webhook_data: dict, gitlab_token: str, gitlab_url: str, gi
             webhook_data=webhook_data,
             additions=additions,
             deletions=deletions,
+            prompt_tokens=token_usage["prompt_tokens"],
+            completion_tokens=token_usage["completion_tokens"],
+            total_tokens=token_usage["total_tokens"],
         ))
 
     except Exception as e:
@@ -207,7 +222,7 @@ def handle_merge_request_event(webhook_data: dict, gitlab_token: str, gitlab_url
 
         # review 代码
         commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-        review_result = _review_with_strategy(changes, commits_text, webhook_data, gitlab_url)
+        review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, gitlab_url)
 
         # 将review结果提交到Gitlab的 notes
         handler.add_merge_request_notes(f'Auto Review Result: \n{review_result}')
@@ -229,6 +244,9 @@ def handle_merge_request_event(webhook_data: dict, gitlab_token: str, gitlab_url
                 additions=additions,
                 deletions=deletions,
                 last_commit_id=last_commit_id,
+                prompt_tokens=token_usage["prompt_tokens"],
+                completion_tokens=token_usage["completion_tokens"],
+                total_tokens=token_usage["total_tokens"],
             )
         )
 
@@ -251,6 +269,7 @@ def handle_github_push_event(webhook_data: dict, github_token: str, github_url: 
         score = 0
         additions = 0
         deletions = 0
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         if push_review_enabled:
             # 获取PUSH的changes
             changes = handler.get_push_changes()
@@ -262,7 +281,7 @@ def handle_github_push_event(webhook_data: dict, github_token: str, github_url: 
 
             if len(changes) > 0:
                 commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-                review_result = _review_with_strategy(changes, commits_text, webhook_data, github_url)
+                review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, github_url)
                 score = CodeReviewer.parse_review_score(review_text=review_result)
                 for item in changes:
                     additions += item.get('additions', 0)
@@ -282,6 +301,9 @@ def handle_github_push_event(webhook_data: dict, github_token: str, github_url: 
             webhook_data=webhook_data,
             additions=additions,
             deletions=deletions,
+            prompt_tokens=token_usage["prompt_tokens"],
+            completion_tokens=token_usage["completion_tokens"],
+            total_tokens=token_usage["total_tokens"],
         ))
 
     except Exception as e:
@@ -347,7 +369,7 @@ def handle_github_pull_request_event(webhook_data: dict, github_token: str, gith
 
         # review 代码
         commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-        review_result = _review_with_strategy(changes, commits_text, webhook_data, github_url)
+        review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, github_url)
 
         # 将review结果提交到GitHub的 notes
         handler.add_pull_request_notes(f'Auto Review Result: \n{review_result}')
@@ -369,6 +391,9 @@ def handle_github_pull_request_event(webhook_data: dict, github_token: str, gith
                 additions=additions,
                 deletions=deletions,
                 last_commit_id=github_last_commit_id,
+                prompt_tokens=token_usage["prompt_tokens"],
+                completion_tokens=token_usage["completion_tokens"],
+                total_tokens=token_usage["total_tokens"],
             ))
 
     except Exception as e:
@@ -391,6 +416,7 @@ def handle_gitea_push_event(webhook_data: dict, gitea_token: str, gitea_url: str
         score = 0
         additions = 0
         deletions = 0
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         if push_review_enabled:
             changes = handler.get_push_changes()
             logger.info('changes: %s', changes)
@@ -401,7 +427,7 @@ def handle_gitea_push_event(webhook_data: dict, gitea_token: str, gitea_url: str
 
             if len(changes) > 0:
                 commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-                review_result = _review_with_strategy(changes, commits_text, webhook_data, gitea_url)
+                review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, gitea_url)
                 score = CodeReviewer.parse_review_score(review_text=review_result)
                 for item in changes:
                     additions += item.get('additions', 0)
@@ -423,6 +449,9 @@ def handle_gitea_push_event(webhook_data: dict, gitea_token: str, gitea_url: str
             webhook_data=webhook_data,
             additions=additions,
             deletions=deletions,
+            prompt_tokens=token_usage["prompt_tokens"],
+            completion_tokens=token_usage["completion_tokens"],
+            total_tokens=token_usage["total_tokens"],
         ))
 
     except Exception as e:
@@ -479,7 +508,7 @@ def handle_gitea_pull_request_event(webhook_data: dict, gitea_token: str, gitea_
             return
 
         commits_text = ';'.join(commit.get('message', '').strip() for commit in commits)
-        review_result = _review_with_strategy(changes, commits_text, webhook_data, gitea_url)
+        review_result, token_usage = _review_with_strategy(changes, commits_text, webhook_data, gitea_url)
 
         handler.add_pull_request_notes(f'Auto Review Result: \n{review_result}')
 
@@ -502,6 +531,9 @@ def handle_gitea_pull_request_event(webhook_data: dict, gitea_token: str, gitea_
                 additions=additions,
                 deletions=deletions,
                 last_commit_id=last_commit_id,
+                prompt_tokens=token_usage["prompt_tokens"],
+                completion_tokens=token_usage["completion_tokens"],
+                total_tokens=token_usage["total_tokens"],
             ))
 
     except Exception as e:

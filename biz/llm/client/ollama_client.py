@@ -11,6 +11,7 @@ from biz.llm.types import NotGiven, NOT_GIVEN
 
 class OllamaClient(BaseClient):
     def __init__(self, api_key: str = None):
+        super().__init__()
         self.default_model = self.default_model = os.getenv("OLLAMA_API_MODEL", "deepseek-r1-8k:14b")
         self.base_url = os.getenv("OLLAMA_API_BASE_URL", "http://127.0.0.1:11434")
         self.client = Client(
@@ -41,5 +42,11 @@ class OllamaClient(BaseClient):
                     model: Optional[str] | NotGiven = NOT_GIVEN,
                     ) -> str:
         response: ChatResponse = self.client.chat(model or self.default_model, messages)
+        # Ollama ChatResponse exposes token counts at top level
+        self._accumulate_usage({
+            "prompt_tokens": int(response.get("prompt_eval_count") or 0),
+            "completion_tokens": int(response.get("eval_count") or 0),
+            "total_tokens": int(response.get("prompt_eval_count") or 0) + int(response.get("eval_count") or 0),
+        })
         content = response['message']['content']
         return self._extract_content(content)

@@ -39,8 +39,18 @@ def _generate_daily_report() -> str | None:
     # 转换为适合生成日报的格式
     commits = df_sorted.to_dict(orient="records")
     # 生成日报内容
-    report_txt = Reporter().generate_report(json.dumps(commits))
+    reporter = Reporter()
+    report_txt = reporter.generate_report(json.dumps(commits))
     logger.info(f"日报生成成功，内容长度: {len(report_txt)} 字符")
+
+    # 记录本次日报的 LLM token 消耗
+    usage = reporter.get_usage()
+    ReviewService.insert_daily_report_log(
+        report_time=int(datetime.now().timestamp()),
+        prompt_tokens=usage["prompt_tokens"],
+        completion_tokens=usage["completion_tokens"],
+        total_tokens=usage["total_tokens"],
+    )
 
     return report_txt
 

@@ -11,6 +11,7 @@ from biz.utils.log import logger
 
 class DeepSeekClient(BaseClient):
     def __init__(self, api_key: str = None):
+        super().__init__()
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
         self.base_url = os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com")
         if not self.api_key:
@@ -35,7 +36,8 @@ class DeepSeekClient(BaseClient):
             if not completion or not completion.choices:
                 logger.error("Empty response from DeepSeek API")
                 return "AI服务返回为空，请稍后重试"
-                
+
+            self._accumulate_usage(getattr(completion, "usage", None))
             return completion.choices[0].message.content
             
         except Exception as e:
@@ -58,6 +60,7 @@ class DeepSeekClient(BaseClient):
         if tools:
             kwargs["tools"] = tools
         completion = self.client.chat.completions.create(**kwargs)
+        self._accumulate_usage(getattr(completion, "usage", None))
         msg = completion.choices[0].message
         tool_calls: List[Dict] = []
         for tc in (msg.tool_calls or []):

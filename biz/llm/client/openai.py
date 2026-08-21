@@ -10,6 +10,7 @@ from biz.llm.types import NotGiven, NOT_GIVEN
 
 class OpenAIClient(BaseClient):
     def __init__(self, api_key: str = None):
+        super().__init__()
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.base_url = os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com")
         if not self.api_key:
@@ -27,6 +28,7 @@ class OpenAIClient(BaseClient):
             model=model,
             messages=messages,
         )
+        self._accumulate_usage(getattr(completion, "usage", None))
         return completion.choices[0].message.content
 
     def chat_with_tools(self,
@@ -39,6 +41,7 @@ class OpenAIClient(BaseClient):
         if tools:
             kwargs["tools"] = tools
         completion = self.client.chat.completions.create(**kwargs)
+        self._accumulate_usage(getattr(completion, "usage", None))
         msg = completion.choices[0].message
         tool_calls: List[Dict] = []
         for tc in (msg.tool_calls or []):

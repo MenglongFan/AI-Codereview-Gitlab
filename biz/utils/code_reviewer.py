@@ -98,11 +98,17 @@ class CodeReviewer(BaseReviewer):
         ]
         return self.call_llm(messages)
 
+    def get_usage(self) -> Dict[str, int]:
+        """Return the token usage accumulated by this reviewer's LLM client."""
+        return self.client.get_usage()
+
     @staticmethod
     def parse_review_score(review_text: str) -> int:
-        """解析 AI 返回的 Review 结果，返回评分"""
+        """解析 AI 返回的 Review 结果，返回评分（限制在 0-100）"""
         if not review_text:
             return 0
         match = re.search(r"总分[:：]\s*(\d+)分?", review_text)
-        return int(match.group(1)) if match else 0
+        if not match:
+            return 0
+        return max(0, min(int(match.group(1)), 100))
 

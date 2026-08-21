@@ -9,6 +9,7 @@ from biz.llm.types import NotGiven, NOT_GIVEN
 
 class ZhipuAIClient(BaseClient):
     def __init__(self, api_key: str = None):
+        super().__init__()
         self.api_key = api_key or os.getenv("ZHIPUAI_API_KEY")
         if not self.api_key:
             raise ValueError("API key is required. Please provide it or set it in the environment variables.")
@@ -25,4 +26,5 @@ class ZhipuAIClient(BaseClient):
             model=model,
             messages=messages,
         )
+        self._accumulate_usage(getattr(completion, "usage", None))
         return completion.choices[0].message.content

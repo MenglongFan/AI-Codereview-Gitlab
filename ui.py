@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import math
 
+import altair as alt
 import streamlit as st
 
 # 设置Streamlit主题 - 必须是第一个st命令
@@ -573,7 +574,11 @@ def render_charts(df):
         st.bar_chart(pc, x="project_name", y="count", horizontal=True, color="#22D3EE")
     with c2:
         st.markdown('<div class="chart-title">项目平均得分</div>', unsafe_allow_html=True)
-        st.bar_chart(ps, x="project_name", y="score", horizontal=True, color="#4ADE80")
+        chart = alt.Chart(ps).mark_bar(color="#4ADE80", cornerRadiusEnd=4).encode(
+            x=alt.X("score:Q", scale=alt.Scale(domain=[0, 100]), title="score"),
+            y=alt.Y("project_name:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
 
     # 开发者提交统计 & 开发者平均得分
     ac = df.groupby("author").size().reset_index(name="count").sort_values("count", ascending=True)
@@ -584,7 +589,11 @@ def render_charts(df):
         st.bar_chart(ac, x="author", y="count", horizontal=True, color="#FBBF24")
     with c4:
         st.markdown('<div class="chart-title">开发者平均得分</div>', unsafe_allow_html=True)
-        st.bar_chart(as_, x="author", y="score", horizontal=True, color="#C084FC")
+        chart = alt.Chart(as_).mark_bar(color="#C084FC", cornerRadiusEnd=4).encode(
+            x=alt.X("score:Q", scale=alt.Scale(domain=[0, 100]), title="score"),
+            y=alt.Y("author:N", sort="x", title=None),
+        )
+        st.altair_chart(chart, use_container_width=True)
 
     # 人员/项目代码变更行数
     acode = df.groupby("author")[["additions", "deletions"]].sum().reset_index()
@@ -622,6 +631,90 @@ def render_kpis(df):
         for label, value, cls in cards
     )
     st.markdown(f'<div class="kpi-grid">{html}</div>', unsafe_allow_html=True)
+
+
+# 渲染 Token 消耗统计（KPI + 聚合图，随侧边栏筛选联动）
+def render_token_stats(df):
+    if df.empty or "total_tokens" not in df.columns:
+        return
+
+    total = int(df["total_tokens"].sum())
+    prompt = int(df["prompt_tokens"].sum())
+    completion = int(df["completion_tokens"].sum())
+    avg = int(df["total_tokens"].mean())
+
+    cards = [
+        ("Token Total", f"{total:,}", "kpi-accent"),
+        ("Prompt Tokens", f"{prompt:,}", "kpi-green"),
+        ("Completion Tokens", f"{completion:,}", "kpi-amber"),
+        ("Avg / Review", f"{avg:,}", "kpi-purple"),
+    ]
+    html = "".join(
+        f'<div class="kpi {cls}"><div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value">{value}</div></div>'
+        for label, value, cls in cards
+    )
+    st.markdown(f'<div class="kpi-grid">{html}</div>', unsafe_allow_html=True)
+
+    # 按项目 / 按作者 token 排行
+    pt = df.groupby("project_name")["total_tokens"].sum().reset_index(name="tokens").sort_values("tokens")
+    at = df.groupby("author")["total_tokens"].sum().reset_index(name="tokens").sort_values("tokens")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="chart-title">Token by Project</div>', unsafe_allow_html=True)
+        st.bar_chart(pt, x="project_name", y="tokens", horizontal=True, color="#22D3EE")
+    with c2:
+        st.markdown('<div class="chart-title">Token by Author</div>', unsafe_allow_html=True)
+        st.bar_chart(at, x="author", y="tokens", horizontal=True, color="#C084FC")
+
+    # Token 时间趋势（按天聚合）
+    daily = df.copy()
+    daily["day"] = pd.to_datetime(daily["updated_at"]).dt.date
+    daily_tokens = daily.groupby("day")["total_tokens"].sum()
+    st.markdown('<div class="chart-title">Token Trend</div>', unsafe_allow_html=True)
+    if len(daily_tokens) > 0:
+        st.area_chart(daily_tokens, color="#22D3EE")
+
+
+# 渲染工作日报的 Token 消耗（独立归类，与 review 统计分开）
+def render_daily_report_stats():
+    try:
+        rdf = ReviewService().get_daily_report_logs()
+    except Exception:
+        return
+    if rdf.empty or "total_tokens" not in rdf.columns:
+        st.caption("日报 Token 消耗：暂无记录")
+        return
+
+    total = int(rdf["total_tokens"].sum())
+    prompt = int(rdf["prompt_tokens"].sum())
+    completion = int(rdf["completion_tokens"].sum())
+
+    cards = [
+        ("Daily Report Tokens", f"{total:,}", "kpi-accent"),
+        ("Prompt Tokens", f"{prompt:,}", "kpi-green"),
+        ("Completion Tokens", f"{completion:,}", "kpi-amber"),
+        ("生成次数", f"{len(rdf)}", "kpi-purple"),
+    ]
+    html = "".join(
+        f'<div class="kpi {cls}"><div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value">{value}</div></div>'
+        for label, value, cls in cards
+    )
+    st.markdown(f'<div class="kpi-grid">{html}</div>', unsafe_allow_html=True)
+
+    rview = rdf.copy()
+    rview["report_time"] = rview["report_time"].apply(
+        lambda ts: datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+        if isinstance(ts, (int, float)) else ts
+    )
+    rview = rview.rename(columns={
+        "report_time": "生成时间",
+        "prompt_tokens": "Prompt",
+        "completion_tokens": "Completion",
+        "total_tokens": "Tokens",
+    })
+    st.dataframe(rview, use_container_width=True, hide_index=True)
 
 
 # 退出登录函数
@@ -664,7 +757,8 @@ def main_page():
 
     # ---- 数据源定义 ----
     mr_columns = ["project_name", "author", "source_branch", "target_branch", "updated_at", "commit_messages", "delta",
-                  "score", "url", 'additions', 'deletions']
+                  "score", "url", 'additions', 'deletions',
+                  "prompt_tokens", "completion_tokens", "total_tokens"]
 
     mr_column_config = {
         "project_name": "项目名称",
@@ -680,10 +774,14 @@ def main_page():
         "url": st.column_config.LinkColumn("操作", max_chars=100, display_text="查看详情"),
         "additions": None,
         "deletions": None,
+        "prompt_tokens": st.column_config.NumberColumn("Prompt", format="%d"),
+        "completion_tokens": st.column_config.NumberColumn("Completion", format="%d"),
+        "total_tokens": st.column_config.NumberColumn("Tokens", format="%d"),
     }
 
     push_columns = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
-                    'additions', 'deletions']
+                    'additions', 'deletions',
+                    "prompt_tokens", "completion_tokens", "total_tokens"]
 
     push_column_config = {
         "project_name": "项目名称",
@@ -697,6 +795,9 @@ def main_page():
         ),
         "additions": None,
         "deletions": None,
+        "prompt_tokens": st.column_config.NumberColumn("Prompt", format="%d"),
+        "completion_tokens": st.column_config.NumberColumn("Completion", format="%d"),
+        "total_tokens": st.column_config.NumberColumn("Tokens", format="%d"),
     }
 
     show_push_tab = os.environ.get('PUSH_REVIEW_ENABLED', '0') == '1'
@@ -743,10 +844,23 @@ def main_page():
     # KPI 指标
     render_kpis(df)
 
+    # Token 消耗统计（明细聚合，随筛选联动）
+    if not df.empty:
+        st.divider()
+        with st.container(border=True):
+            st.markdown('<div class="chart-title">Token 消耗统计</div>', unsafe_allow_html=True)
+            render_token_stats(df)
+
     # 统计图表
     with st.container(border=True):
         st.markdown('<div class="chart-title">统计图表</div>', unsafe_allow_html=True)
         render_charts(df)
+
+    # 工作日报 Token 消耗（独立归类）
+    st.divider()
+    with st.container(border=True):
+        st.markdown('<div class="chart-title">日报 Token 消耗</div>', unsafe_allow_html=True)
+        render_daily_report_stats()
 
     # 数据明细
     with st.container(border=True):

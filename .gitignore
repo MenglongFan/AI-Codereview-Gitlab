@@ -24,3 +24,6 @@ data/repo_cache/
 # Test coverage artifact
 .coverage
 .pytest_cache/
+
+# CodeBuddy IDE project data
+/.codebuddy/

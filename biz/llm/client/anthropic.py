@@ -11,6 +11,7 @@ from biz.llm.types import NotGiven, NOT_GIVEN
 
 class AnthropicClient(BaseClient):
     def __init__(self, api_key: str = None):
+        super().__init__()
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.base_url = os.getenv("ANTHROPIC_API_BASE_URL", None)
         if not self.api_key:
@@ -62,6 +63,13 @@ class AnthropicClient(BaseClient):
         )
 
         # Extract text from response
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            self._accumulate_usage({
+                "prompt_tokens": getattr(usage, "input_tokens", 0) or 0,
+                "completion_tokens": getattr(usage, "output_tokens", 0) or 0,
+                "total_tokens": (getattr(usage, "input_tokens", 0) or 0) + (getattr(usage, "output_tokens", 0) or 0),
+            })
         return response.content[0].text
 
     def chat_with_tools(self,
@@ -74,6 +82,7 @@ class AnthropicClient(BaseClient):
         if tools:
             kwargs["tools"] = tools
         completion = self.client.chat.completions.create(**kwargs)
+        self._accumulate_usage(getattr(completion, "usage", None))
         msg = completion.choices[0].message
         tool_calls: List[Dict] = []
         for tc in (msg.tool_calls or []):

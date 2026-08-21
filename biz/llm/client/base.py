@@ -9,6 +9,22 @@ from biz.utils.log import logger
 class BaseClient:
     """ Base class for chat models client. """
 
+    def __init__(self):
+        # Token usage accumulator. Each client instance corresponds to one
+        # review / report task, so accumulating here gives exact per-task usage.
+        self._usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+    def _accumulate_usage(self, usage: Optional[Dict] = None) -> None:
+        """Tolerant accumulation: missing / None fields are treated as 0."""
+        u = usage or {}
+        self._usage["prompt_tokens"] += int(u.get("prompt_tokens") or 0)
+        self._usage["completion_tokens"] += int(u.get("completion_tokens") or 0)
+        self._usage["total_tokens"] += int(u.get("total_tokens") or 0)
+
+    def get_usage(self) -> Dict[str, int]:
+        """Return a snapshot of the accumulated token usage for this task."""
+        return dict(self._usage)
+
     def ping(self) -> bool:
         """Ping the model to check connectivity."""
         try:
