@@ -40,6 +40,7 @@ class ReviewService:
                             updated_at INTEGER,
                             commit_messages TEXT,
                             score INTEGER,
+                            url TEXT,
                             review_result TEXT,
                             additions INTEGER DEFAULT 0,
                             deletions INTEGER DEFAULT 0
@@ -72,6 +73,12 @@ class ReviewService:
                     for column in token_columns:
                         if column not in current_columns:
                             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} INTEGER DEFAULT 0")
+
+                # 为 push_review_log 添加 url 列（详情链接），幂等迁移
+                cursor.execute("PRAGMA table_info('push_review_log')")
+                current_columns = [col[1] for col in cursor.fetchall()]
+                if "url" not in current_columns:
+                    cursor.execute("ALTER TABLE push_review_log ADD COLUMN url TEXT DEFAULT ''")
 
                 # 为旧版本的mr_review_log表添加last_commit_id字段
                 mr_columns = [
@@ -176,13 +183,17 @@ class ReviewService:
         try:
             with sqlite3.connect(ReviewService.DB_FILE) as conn:
                 cursor = conn.cursor()
+                # 详情链接取首个提交的 url（GitLab/GitHub push hook 的 commit 自带 url）
+                url = ""
+                if entity.commits and isinstance(entity.commits, list):
+                    url = entity.commits[0].get("url", "") or ""
                 cursor.execute('''
-                                INSERT INTO push_review_log (project_name,author, branch, updated_at, commit_messages, score,review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                INSERT INTO push_review_log (project_name,author, branch, updated_at, commit_messages, score, url, review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ''',
                                (entity.project_name, entity.author, entity.branch,
                                 entity.updated_at, entity.commit_messages, entity.score,
-                                entity.review_result, entity.additions, entity.deletions,
+                                url, entity.review_result, entity.additions, entity.deletions,
                                 entity.prompt_tokens, entity.completion_tokens, entity.total_tokens))
                 conn.commit()
         except sqlite3.DatabaseError as e:
@@ -196,7 +207,7 @@ class ReviewService:
             with sqlite3.connect(ReviewService.DB_FILE) as conn:
                 # 基础查询
                 query = """
-                    SELECT project_name, author, branch, updated_at, commit_messages, score, review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens
+                    SELECT project_name, author, branch, updated_at, commit_messages, score, url, review_result, additions, deletions, prompt_tokens, completion_tokens, total_tokens
                     FROM push_review_log
                     WHERE 1=1
                 """
