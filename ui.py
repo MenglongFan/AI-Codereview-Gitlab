@@ -12,7 +12,7 @@ import time
 import altair as alt
 import pandas as pd
 import streamlit as st
-st.set_page_config(layout="wide", page_title="AI代码审查平台", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="AI代码审查平台", initial_sidebar_state="collapsed")
 from dotenv import load_dotenv
 
 from biz.service.review_service import ReviewService
@@ -251,29 +251,6 @@ div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !imp
     background-image:
         radial-gradient(1100px 340px at 50% -160px, rgba(76, 141, 255, 0.07), transparent 70%);
     background-attachment: fixed;
-}
-
-/* ---- 侧边栏：平坦深灰面板 + 发丝线 ---- */
-[data-testid="stSidebar"] {
-    background: var(--bg-soft);
-    border-right: 1px solid var(--border);
-}
-[data-testid="stSidebar"] .block-container {padding-top: 1.2rem !important;}
-.side-label {
-    font-family: var(--mono);
-    font-size: 0.64rem;
-    font-weight: 600;
-    color: var(--text-faint);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin: 0.8rem 0 0.4rem 0;
-}
-.side-version {
-    font-family: var(--mono);
-    font-size: 0.62rem;
-    color: var(--text-faint);
-    margin-top: 1.4rem;
-    letter-spacing: 0.04em;
 }
 
 /* ---- 顶部导航栏：去框线 + 渐变光丝 ---- */
@@ -579,30 +556,12 @@ div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !imp
     background: var(--surface-3);
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.3);
 }
-
-/* ---- 侧边栏控件文字与聚焦态 ---- */
-[data-testid="stSidebar"] label p,
-[data-testid="stSidebar"] [data-baseweb="select"] div {
-    font-size: 0.8rem;
-}
-[data-testid="stSidebar"] [data-baseweb="select"] > div,
-[data-testid="stSidebar"] [data-baseweb="input"] input {
-    background: var(--surface-2);
-    border-color: var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-}
-[data-testid="stSidebar"] [data-baseweb="select"] > div:hover,
-[data-testid="stSidebar"] [data-baseweb="input"] input:hover {
-    background: var(--surface-3);
-    border-color: rgba(76, 141, 255, 0.45);
-}
-[data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within,
-[data-testid="stSidebar"] [data-baseweb="input"] input:focus {
-    border-color: var(--accent) !important;
-    box-shadow: var(--ring);
-}
+[data-testid="stSegmentedControl"] {width: 100%;}
+[data-testid="stSegmentedControl"] > div {width: 100%;}
+[data-testid="stDateInput"] {width: 100%;}
+[data-testid="stDateInput"] [data-baseweb="input"] {width: 100%;}
+[data-testid="stMultiselect"] {width: 100%;}
+[data-testid="stMultiselect"] [data-baseweb="select"] {width: 100%;}
 
 /* ---- 数据表：平坦 + 发丝行线 + hover 行 ---- */
 [data-testid="stDataFrame"],
@@ -627,7 +586,7 @@ div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !imp
 [data-testid="stDataEditor"] td {
     background: transparent;
     color: var(--text-dim);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02) !important;
     font-size: 0.8rem;
 }
 [data-testid="stDataFrame"] tbody tr:hover td,
@@ -690,6 +649,12 @@ div.block-container {padding-top: 1.1rem !important; padding-bottom: 1.5rem !imp
     background: var(--surface-2);
     border-color: var(--border);
     color: var(--text);
+}
+[data-testid="stDateInput"] [data-baseweb="input"]:hover,
+[data-testid="stMultiselect"] [data-baseweb="select"] > div:hover,
+[data-testid="stTextInput"] input:hover {
+    background: var(--surface-3);
+    border-color: rgba(76, 141, 255, 0.45);
 }
 [data-testid="stDateInput"] [data-baseweb="input"]:focus-within,
 [data-testid="stMultiselect"] [data-baseweb="select"] > div:focus-within,
@@ -1279,8 +1244,8 @@ def login_page():
         st.markdown('<div class="login-version">AI-Codereview-Gitlab · v1</div>', unsafe_allow_html=True)
 
 
-# 渲染时间范围筛选（预设按钮 + 日期选择联动，侧边栏紧凑版）
-def render_date_filter(tab_key):
+# 渲染时间范围筛选（预设按钮 + 日期选择联动，主页面紧凑版）
+def render_date_filter(tab_key, columns=None):
     presets = {"近7天": 7, "近30天": 30, "近90天": 90, "全部": None}
     preset = st.segmented_control(
         "时间范围", list(presets.keys()), default="近7天", key=f"{tab_key}_preset"
@@ -1298,12 +1263,16 @@ def render_date_filter(tab_key):
     current_date = datetime.date.today()
     days = presets[preset]
     if days is None:
+        if columns is not None:
+            for col in columns:
+                col.caption("不限时间范围")
         return None, None
 
     default_start = current_date - datetime.timedelta(days=days)
-    c1, c2 = st.columns(2)
-    start_date = c1.date_input("开始", value=default_start, key=f"{tab_key}_start")
-    end_date = c2.date_input("结束", value=current_date, key=f"{tab_key}_end")
+    if columns is None:
+        columns = st.columns(2)
+    start_date = columns[0].date_input("开始", value=default_start, key=f"{tab_key}_start")
+    end_date = columns[1].date_input("结束", value=current_date, key=f"{tab_key}_end")
     return start_date, end_date
 
 
@@ -1342,6 +1311,25 @@ def _dev_chart(chart, height=None):
     if height is not None:
         cfg = cfg.properties(height=height)
     return cfg
+
+
+def _v_grad(top, bottom):
+    """垂直渐变（上亮下深），为柱状图增加光泽感。坐标按 normalized [0,1] 解析。"""
+    return alt.LinearGradient(
+        gradient="linear",
+        x1=0, y1=0, x2=0, y2=1,
+        stops=[
+            alt.GradientStop(color=top, offset=0),
+            alt.GradientStop(color=bottom, offset=1),
+        ],
+    )
+
+
+def _bar_hover():
+    """柱状图悬停高亮：返回 (selection, opacity encoding)。"""
+    hover = alt.selection_point(on="pointerover", empty=False)
+    opacity = alt.condition(hover, alt.value(1.0), alt.value(0.5))
+    return hover, opacity
 
 
 # GitLab 提交统计风格：53 周 × 7 天热力图配色与阈值
@@ -1464,6 +1452,7 @@ def _grouped_change_chart(df, key):
     df["type"] = df["type"].map({"additions": "新增", "deletions": "删除"})
     xmax = max(df["lines"].max() if not df.empty else 0, 1)
     color_scale = alt.Scale(domain=["新增", "删除"], range=["#3FB950", "#F85149"])
+    hover, opacity = _bar_hover()
     return _dev_chart(
         alt.Chart(df)
         .mark_bar(cornerRadiusEnd=4)
@@ -1476,7 +1465,9 @@ def _grouped_change_chart(df, key):
             ),
             y=alt.Y(f"{key}:N", sort="-x", title=None),
             color=alt.Color("type:N", scale=color_scale, title=None),
-        ),
+            opacity=opacity,
+        )
+        .add_params(hover),
         height=300,
     )
 
@@ -1500,8 +1491,11 @@ def render_charts(df):
     with c1:
         st.markdown('<div class="chart-title">项目提交统计</div>', unsafe_allow_html=True)
         pmax = max(pc["count"].max() if not pc.empty else 0, 1)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(pc).mark_bar(color="#4C8DFF", cornerRadiusEnd=4).encode(
+            alt.Chart(pc)
+            .mark_bar(color=_v_grad("#6FA3FF", "#2B5CD6"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X(
                     "count:Q",
                     scale=alt.Scale(domain=[0, pmax * 1.1]),
@@ -1509,17 +1503,24 @@ def render_charts(df):
                     axis=alt.Axis(tickMinStep=1, format="d", labelExpr="datum.value % 1 === 0 ? datum.label : ''"),
                 ),
                 y=alt.Y("project_name:N", sort="-x", title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
     with c2:
         st.markdown('<div class="chart-title">项目平均得分</div>', unsafe_allow_html=True)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(ps).mark_bar(color="#3FB950", cornerRadiusEnd=4).encode(
+            alt.Chart(ps)
+            .mark_bar(color=_v_grad("#56D364", "#2F9E44"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X("score:Q", scale=alt.Scale(domain=[0, 100]), title=None),
                 y=alt.Y("project_name:N", sort="-x", title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
@@ -1531,8 +1532,11 @@ def render_charts(df):
     with c3:
         st.markdown('<div class="chart-title">开发者提交统计</div>', unsafe_allow_html=True)
         amax = max(ac["count"].max() if not ac.empty else 0, 1)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(ac).mark_bar(color="#D29922", cornerRadiusEnd=4).encode(
+            alt.Chart(ac)
+            .mark_bar(color=_v_grad("#E3B341", "#9A6E14"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X(
                     "count:Q",
                     scale=alt.Scale(domain=[0, amax * 1.1]),
@@ -1540,17 +1544,24 @@ def render_charts(df):
                     axis=alt.Axis(tickMinStep=1, format="d", labelExpr="datum.value % 1 === 0 ? datum.label : ''"),
                 ),
                 y=alt.Y("author:N", sort="-x", title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
     with c4:
         st.markdown('<div class="chart-title">开发者平均得分</div>', unsafe_allow_html=True)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(as_).mark_bar(color="#A371F7", cornerRadiusEnd=4).encode(
+            alt.Chart(as_)
+            .mark_bar(color=_v_grad("#A78BFA", "#6E3FD1"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X("score:Q", scale=alt.Scale(domain=[0, 100]), title=None),
                 y=alt.Y("author:N", sort="-x", title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
@@ -1655,8 +1666,11 @@ def render_token_stats(df):
     with c1:
         st.markdown('<div class="chart-title">Token by Project</div>', unsafe_allow_html=True)
         pmax = max(pt["tokens"].max() if not pt.empty else 0, 1)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(pt).mark_bar(color="#4C8DFF", cornerRadiusEnd=4).encode(
+            alt.Chart(pt)
+            .mark_bar(color=_v_grad("#6FA3FF", "#2B5CD6"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X(
                     "tokens:Q",
                     scale=alt.Scale(domain=[0, pmax * 1.1]),
@@ -1664,15 +1678,20 @@ def render_token_stats(df):
                     axis=alt.Axis(tickMinStep=1, format="d", labelExpr="datum.value % 1 === 0 ? datum.label : ''"),
                 ),
                 y=alt.Y("project_name:N", sort=alt.EncodingSortField(field="tokens", op="sum", order="descending"), title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
     with c2:
         st.markdown('<div class="chart-title">Token by Author</div>', unsafe_allow_html=True)
         amax = max(at["tokens"].max() if not at.empty else 0, 1)
+        hover, opacity = _bar_hover()
         chart = _dev_chart(
-            alt.Chart(at).mark_bar(color="#A371F7", cornerRadiusEnd=4).encode(
+            alt.Chart(at)
+            .mark_bar(color=_v_grad("#A78BFA", "#6E3FD1"), cornerRadiusEnd=4)
+            .encode(
                 x=alt.X(
                     "tokens:Q",
                     scale=alt.Scale(domain=[0, amax * 1.1]),
@@ -1680,7 +1699,9 @@ def render_token_stats(df):
                     axis=alt.Axis(tickMinStep=1, format="d", labelExpr="datum.value % 1 === 0 ? datum.label : ''"),
                 ),
                 y=alt.Y("author:N", sort=alt.EncodingSortField(field="tokens", op="sum", order="descending"), title=None),
-            ),
+                opacity=opacity,
+            )
+            .add_params(hover),
             height=300,
         )
         st.altair_chart(chart, use_container_width=True)
@@ -1691,12 +1712,19 @@ def render_token_stats(df):
     daily_tokens = daily.groupby("day")["total_tokens"].sum().reset_index(name="tokens")
     st.markdown('<div class="chart-title">Token Trend</div>', unsafe_allow_html=True)
     if len(daily_tokens) > 0:
+        area_grad = alt.LinearGradient(
+            gradient="linear",
+            x1=0, y1=0, x2=0, y2=1,
+            stops=[
+                alt.GradientStop(color="rgba(76, 141, 255, 0.30)", offset=0),
+                alt.GradientStop(color="rgba(76, 141, 255, 0.02)", offset=1),
+            ],
+        )
         chart = _dev_chart(
             alt.Chart(daily_tokens)
             .mark_area(
-                color="#4C8DFF",
-                opacity=0.12,
-                line={"color": "#4C8DFF", "strokeWidth": 2.5},
+                color=area_grad,
+                line={"color": "#6FA3FF", "strokeWidth": 2.5},
                 interpolate="monotone",
             )
             .encode(
@@ -1788,7 +1816,7 @@ MR_COLUMN_CONFIG = {
     "deletions": None,
 }
 
-PUSH_COLUMNS = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score",
+PUSH_COLUMNS = ["project_name", "author", "branch", "updated_at", "commit_messages", "delta", "score", "url",
                 "additions", "deletions"]
 
 PUSH_COLUMN_CONFIG = {
@@ -1801,6 +1829,7 @@ PUSH_COLUMN_CONFIG = {
     "score": st.column_config.ProgressColumn(
         "得分", min_value=0, max_value=100, format="%d",
     ),
+    "url": st.column_config.LinkColumn("操作", max_chars=100, display_text="查看详情"),
     "additions": None,
     "deletions": None,
 }
@@ -1873,12 +1902,15 @@ def _load_combined_base(start_datetime, end_datetime):
 
 
 def render_shared_filter():
-    """侧边栏共享筛选：时间预设 + 日期 + 开发者 + 项目。
+    """主页面顶部共享筛选条：时间预设 + 日期 + 开发者 + 项目。
 
     选项列表来自 MR + Push 合并记录，保证各选项卡都能选中自己源的数据。
     返回 dict，供各内容块渲染函数使用。
     """
-    start_date, end_date = render_date_filter("dash")
+    # 第一行：时间范围预设 + 起止日期
+    c1, c2, c3 = st.columns([1.35, 1, 1], gap="small")
+    with c1:
+        start_date, end_date = render_date_filter("dash", columns=[c2, c3])
 
     start_datetime = (int(datetime.datetime.combine(start_date, datetime.time.min).timestamp())
                       if start_date else None)
@@ -1889,8 +1921,14 @@ def render_shared_filter():
     unique_authors = (sorted(base["author"].dropna().unique().tolist()) if not base.empty else [])
     unique_projects = (sorted(base["project_name"].dropna().unique().tolist()) if not base.empty else [])
 
-    authors = st.multiselect("开发者", unique_authors, default=[], key="dash_authors")
-    project_names = st.multiselect("项目名称", unique_projects, default=[], key="dash_projects")
+    # 第二行：开发者 + 项目多选
+    c4, c5 = st.columns([1, 1], gap="small")
+    with c4:
+        authors = st.multiselect("开发者", unique_authors, default=[], key="dash_authors",
+                                 placeholder="全部开发者")
+    with c5:
+        project_names = st.multiselect("项目名称", unique_projects, default=[], key="dash_projects",
+                                       placeholder="全部项目")
 
     return {
         "authors": authors,
@@ -1911,19 +1949,17 @@ def render_review_block(service_func, columns, column_config, filters):
     render_kpis(df)
 
     # 统计图表
-    with st.container(border=True):
-        st.markdown('<div class="chart-title">统计图表</div>', unsafe_allow_html=True)
-        render_charts(df)
+    st.markdown('<div class="chart-title">统计图表</div>', unsafe_allow_html=True)
+    render_charts(df)
 
     # 数据明细（token 相关列已移入 Token 统计选项卡）
-    with st.container(border=True):
-        st.markdown('<div class="chart-title">数据明细</div>', unsafe_allow_html=True)
-        st.data_editor(
-            df,
-            use_container_width=True,
-            column_config=column_config,
-            hide_index=True,
-        )
+    st.markdown('<div class="chart-title">数据明细</div>', unsafe_allow_html=True)
+    st.data_editor(
+        df,
+        use_container_width=True,
+        column_config=column_config,
+        hide_index=True,
+    )
 
 
 # ============ Token 统计块 ============
@@ -1952,44 +1988,38 @@ def render_token_block(filters):
                              updated_at_lte=filters["end_datetime"])
 
     # 审查 Token（MR + Push 合并展示）
-    with st.container(border=True):
-        source_label = "MR + Push" if push_review_enabled() else "MR"
-        st.markdown(f'<div class="chart-title">审查 Token · {source_label}</div>', unsafe_allow_html=True)
-        render_token_stats(rdf)
+    source_label = "MR + Push" if push_review_enabled() else "MR"
+    st.markdown(f'<div class="chart-title">审查 Token · {source_label}</div>', unsafe_allow_html=True)
+    render_token_stats(rdf)
 
     # 审查 Token 明细（含 token 列）
-    with st.container(border=True):
-        st.markdown('<div class="chart-title">审查 Token 明细</div>', unsafe_allow_html=True)
-        if rdf.empty:
-            st.info("当前筛选条件下暂无数据")
-        else:
-            detail = rdf[["project_name", "author", "updated_at",
-                          "prompt_tokens", "completion_tokens", "total_tokens"]].rename(columns={
-                "project_name": "项目",
-                "author": "开发者",
-                "updated_at": "更新时间",
-                "prompt_tokens": "Prompt",
-                "completion_tokens": "Completion",
-                "total_tokens": "Tokens",
-            })
-            st.dataframe(detail, use_container_width=True, hide_index=True)
+    st.markdown('<div class="chart-title">审查 Token 明细</div>', unsafe_allow_html=True)
+    if rdf.empty:
+        st.info("当前筛选条件下暂无数据")
+    else:
+        detail = rdf[["project_name", "author", "updated_at",
+                      "prompt_tokens", "completion_tokens", "total_tokens"]].rename(columns={
+            "project_name": "项目",
+            "author": "开发者",
+            "updated_at": "更新时间",
+            "prompt_tokens": "Prompt",
+            "completion_tokens": "Completion",
+            "total_tokens": "Tokens",
+        })
+        st.dataframe(detail, use_container_width=True, hide_index=True)
 
     # 日报 Token（共用本页时间筛选）
-    st.divider()
-    with st.container(border=True):
-        st.markdown('<div class="chart-title">日报 Token 消耗</div>', unsafe_allow_html=True)
-        render_daily_report_stats(updated_at_gte=filters["start_datetime"],
-                                  updated_at_lte=filters["end_datetime"])
+    st.markdown('<div class="chart-title">日报 Token 消耗</div>', unsafe_allow_html=True)
+    render_daily_report_stats(updated_at_gte=filters["start_datetime"],
+                              updated_at_lte=filters["end_datetime"])
 
 
 # ============ 仪表盘（单页，选项卡切换 MR / Push / Token） ============
 def render_dashboard_page():
     render_header("审查仪表盘", "AI REVIEW · DASHBOARD", logout_key="logout_dashboard")
 
-    with st.sidebar:
-        st.markdown('<div class="side-label">Filter</div>', unsafe_allow_html=True)
-        filters = render_shared_filter()
-        st.markdown('<div class="side-version">AI-Codereview-Gitlab · v1</div>', unsafe_allow_html=True)
+    # 共享筛选（主页面顶部，作用于全部选项卡）
+    filters = render_shared_filter()
 
     tab_labels = ["MR 审查"]
     if push_review_enabled():
@@ -2009,7 +2039,7 @@ def render_dashboard_page():
 
 
 # ============ 主入口 ============
-# 单一仪表盘页（MR / Push / Token 三块用选项卡切换），侧边栏只放共享筛选。
+# 单一仪表盘页（MR / Push / Token 三块用选项卡切换），共享筛选位于主页面顶部。
 if not check_login_status():
     login_page()
     st.stop()
