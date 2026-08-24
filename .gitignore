@@ -27,3 +27,4 @@ data/repo_cache/
 
 # CodeBuddy IDE project data
 /.codebuddy/
+/.workbuddy/

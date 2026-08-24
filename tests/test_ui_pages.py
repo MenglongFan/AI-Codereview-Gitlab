@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""UI 冒烟测试：验证 st.navigation 多页拆分结构（MR/Push/Token）可正常渲染。
+"""UI 冒烟测试：验证单页仪表盘（选项卡切换 MR/Push/Token）可正常渲染。
 
-- test_default_page_is_mr_review：以真实入口（from_file）运行 ui.py，
-  验证登录 → st.navigation → 默认页（MR 审查）的完整链路。
-- 其余用例直接调用页面渲染函数，验证各页面独立渲染不抛异常。
+- test_default_page_is_dashboard：以真实入口（from_file）运行 ui.py，
+  验证登录 → 仪表盘 → 选项卡结构（MR / Push / Token）的完整链路。
+- test_token_section_renders：仪表盘内 Token 选项卡含审查 Token（MR + Push）
+  与日报 Token 区块；「来源」过滤控件已移除，标题始终显示 MR + Push。
 
 通过 stub CookieManager 构造已登录状态，使用 streamlit.testing.v1.AppTest
 （进程内执行，patch 可见）。
@@ -60,48 +61,27 @@ def _markdown_values(at: AppTest):
     return [m.value for m in at.markdown]
 
 
-def test_default_page_is_mr_review(ui_import_ctx, push_enabled):
-    """真实入口：默认页为 MR 审查，且审查页不再展示 token 消耗区块。"""
+def test_default_page_is_dashboard(ui_import_ctx, push_enabled):
+    """真实入口：默认渲染仪表盘，选项卡为 MR / Push / Token。"""
     at = AppTest.from_file(UI_PATH, default_timeout=30)
     at.run(timeout=30)
     assert not at.exception, list(at.exception)
 
     values = _markdown_values(at)
-    assert any("MR 审查" in v for v in values), values
+    assert any("审查仪表盘" in v for v in values), values
     assert any("AI REVIEW" in v for v in values), values
-    # 审查页不应再出现 token 消耗区块（已移入 Token 统计页）
-    assert not any("Token 消耗统计" in v for v in values), values
+
+    tab_labels = [t.label for t in at.tabs]
+    assert tab_labels == ["MR 审查", "Push 审查", "Token 统计"], tab_labels
 
 
-def _token_page_app():
-    import ui
-
-    ui.render_token_page()
-
-
-def _push_page_app():
-    import ui
-
-    ui.render_push_review_page()
-
-
-def test_token_page_renders(ui_import_ctx, push_enabled):
-    """Token 统计页：含审查 Token（合并 MR+Push）与日报 Token 区块。"""
-    at = AppTest.from_function(_token_page_app, default_timeout=30)
+def test_token_section_renders(ui_import_ctx, push_enabled):
+    """仪表盘内 Token 选项卡：含审查 Token（MR + Push 合并）与日报 Token 区块。"""
+    at = AppTest.from_file(UI_PATH, default_timeout=30)
     at.run(timeout=30)
     assert not at.exception, list(at.exception)
 
     values = _markdown_values(at)
-    assert any("Token 统计" in v for v in values), values
-    assert any("审查 Token" in v for v in values), values
+    assert any("审查 Token · MR + Push" in v for v in values), values
+    assert any("审查 Token 明细" in v for v in values), values
     assert any("日报 Token 消耗" in v for v in values), values
-
-
-def test_push_page_renders(ui_import_ctx, push_enabled):
-    """Push 审查页可正常渲染（PUSH_REVIEW_ENABLED=1）。"""
-    at = AppTest.from_function(_push_page_app, default_timeout=30)
-    at.run(timeout=30)
-    assert not at.exception, list(at.exception)
-
-    values = _markdown_values(at)
-    assert any("Push 审查" in v for v in values), values
