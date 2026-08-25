@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-4",
+  "project": "dolphin-device-web",
+  "title": "历史 review id=4 (score=94)",
+  "report_file": "analysis/exports/samples/review_4.md",
+  "labels": {
+    "id": 4,
+    "project": "dolphin-device-web",
+    "score": 94,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 2,
+    "vague_issues": 1,
+    "false_positive_count": 1,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.55,
+    "score_calibration": "good",
+    "quality_grade": "B",
+    "notes": "纯前端 v-hasPermi 小提交，无实质缺陷，94 分与问题严重度匹配合理。但'缺少自动化测试'为空泛建议，'权限码硬编码'轻微。整体准确但深度不足。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 good，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

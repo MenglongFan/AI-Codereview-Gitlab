@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-27",
+  "project": "etl_station",
+  "title": "历史 review id=27 (score=42)",
+  "report_file": "analysis/exports/samples/review_27.md",
+  "labels": {
+    "id": 27,
+    "project": "etl_station",
+    "score": 42,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 9,
+    "vague_issues": 2,
+    "false_positive_count": 2,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.85,
+    "score_calibration": "good",
+    "quality_grade": "B",
+    "notes": "压测接口审查非常认真，覆盖 DoS/无资源限制、类型转换、数据源选择、SQL 提取等核心风险。部分'日志 Emoji'、'方法过长'、'Map 返回类型'属轻微凑数。低分 42 与多而严重的问题匹配，校准合理。整体高质量但含少量琐碎项。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 good，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

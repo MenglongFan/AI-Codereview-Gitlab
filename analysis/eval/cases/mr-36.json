@@ -1,0 +1,45 @@
+{
+  "case_id": "mr-36",
+  "project": "five_knowledge",
+  "title": "TagCategory.vue 标签分类管理页面 (+309/-40)",
+  "diff_ref": "analysis/exports/gitlab_export/review_36_diff.json",
+  "ground_truth": [
+    {
+      "location": "src/router/index.js",
+      "severity": "trivial",
+      "desc": "临时路由清理不彻底",
+      "fn": false
+    },
+    {
+      "location": "TagCategory.vue:handleAdd/handleView/handleEdit/handleDelete",
+      "severity": "high-value",
+      "desc": "增删改查全部占位未实现（ElMessage.info('待实现')），核心功能缺失",
+      "fn": true
+    },
+    {
+      "location": "TagCategory.vue",
+      "severity": "medium",
+      "desc": "空文件误判：实际 +308/-20 完整实现（历史误报，作为反例基线）",
+      "fn": false,
+      "fp_ref": true
+    },
+    {
+      "location": "TagCategory.vue:getTreeData/getTableData",
+      "severity": "medium",
+      "desc": "catch 后仅 console.error 静默吞异常，无用户提示",
+      "fn": true
+    },
+    {
+      "location": "TagCategory.vue:getTableData",
+      "severity": "trivial",
+      "desc": "res.data 未判空直接访问 records/total",
+      "fn": true
+    },
+    {
+      "location": "TagCategory.vue:el-tree",
+      "severity": "trivial",
+      "desc": "default-expand-all=true 默认展开全部节点，大数据量性能隐患",
+      "fn": true
+    }
+  ]
+}

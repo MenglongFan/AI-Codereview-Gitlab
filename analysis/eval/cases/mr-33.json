@@ -1,0 +1,86 @@
+{
+  "case_id": "mr-33",
+  "project": "etl_station",
+  "title": "badger-fusion 压测接口 benchmarkFetchTdb (+430/-59)",
+  "diff_ref": "analysis/exports/gitlab_export/review_33_diff.json",
+  "ground_truth": [
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdb",
+      "severity": "high-value",
+      "desc": "Controller 入参 Map<String,Object> 强转 (List<String>) 无校验/无 DTO，异常输入/DoS 风险",
+      "fn": false
+    },
+    {
+      "location": "TdbBenchmarkDialog.vue",
+      "severity": "medium",
+      "desc": "前端防重复提交不严",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl",
+      "severity": "trivial",
+      "desc": "接口方法重载冗余",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoInstanceController",
+      "severity": "trivial",
+      "desc": "Map 作为 Controller 入参",
+      "fn": false
+    },
+    {
+      "location": "algorithm.ts",
+      "severity": "trivial",
+      "desc": "前端 any/复杂模板",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl",
+      "severity": "trivial",
+      "desc": "多余空行",
+      "fn": false
+    },
+    {
+      "location": "commit",
+      "severity": "trivial",
+      "desc": "提交信息笼统",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdb",
+      "severity": "medium",
+      "desc": "System.out.println 调试残留",
+      "fn": true
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdb",
+      "severity": "medium",
+      "desc": "时间解析失败静默降级为 0 时间戳",
+      "fn": true
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdb",
+      "severity": "medium",
+      "desc": "ForkJoinPool.commonPool 无线程池/资源控制",
+      "fn": true
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdbDataAsync",
+      "severity": "medium",
+      "desc": "datasourceId 硬编码默认 1L，点位表与 extractionSql 均缺 datasource_id 时静默查询错误数据源",
+      "fn": true
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:benchmarkFetchTdbDataAsync",
+      "severity": "medium",
+      "desc": "耗时统计口径不一致：非 JsTdb 分支 fetchTimeAccumulatedMs 为墙上时间，JsTdb 分支为累加纯 API 耗时",
+      "fn": true
+    },
+    {
+      "location": "FusionAlgoInstanceServiceImpl:import",
+      "severity": "trivial",
+      "desc": "通配符导入 java.util.concurrent.* 且与具体导入并存，降低可读性",
+      "fn": true
+    }
+  ]
+}

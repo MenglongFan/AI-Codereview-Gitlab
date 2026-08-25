@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-26",
+  "project": "etl_station",
+  "title": "历史 review id=26 (score=74)",
+  "report_file": "analysis/exports/samples/review_26.md",
+  "labels": {
+    "id": 26,
+    "project": "etl_station",
+    "score": 74,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 7,
+    "vague_issues": 1,
+    "false_positive_count": 1,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.85,
+    "score_calibration": "loose",
+    "quality_grade": "B",
+    "notes": "抓住了核心风险：时间空值校验后置、非法 ID 致全批失败、异常信息泄露。问题具体、建议可落地。CopyOnWriteArrayList、串行预加载属轻微优化。有高优问题却给 74 分略宽松。整体良好。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

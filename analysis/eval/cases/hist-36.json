@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-36",
+  "project": "five_knowledge",
+  "title": "历史 review id=36 (score=63)",
+  "report_file": "analysis/exports/samples/review_36.md",
+  "labels": {
+    "id": 36,
+    "project": "five_knowledge",
+    "score": 63,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 6,
+    "vague_issues": 1,
+    "false_positive_count": 3,
+    "missed_critical_count": 1,
+    "actionable_ratio": 0.7,
+    "score_calibration": "off",
+    "quality_grade": "C",
+    "notes": "重大误报：2798 行新增提交被描述为'TagCategory.vue 空文件致功能不可用'（空文件很可能是 diff 统计异常，属误判），并将其作为严重问题大幅扣分。同时把文档暴露的既有'/kb/downLoad 无 token'风险归入本次审查。遗漏了对前端大量功能实现（字段映射、v-repeat-click、表单校验）的实质审查。GET 删除接口语义问题抓得对。分数基于误报偏离。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 off，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 C（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

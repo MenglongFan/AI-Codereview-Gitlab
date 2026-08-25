@@ -1,0 +1,7 @@
+{
+  "case_id": "mr-34",
+  "project": "eagle_v2",
+  "title": "spacemap_asset_sync.go copier 指针层级修正 (+3/-3)",
+  "diff_ref": "analysis/exports/gitlab_export/review_34_diff.json",
+  "ground_truth": []
+}

@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-16",
+  "project": "Eagle-web",
+  "title": "历史 review id=16 (score=80)",
+  "report_file": "analysis/exports/samples/review_16.md",
+  "labels": {
+    "id": 16,
+    "project": "Eagle-web",
+    "score": 80,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 9,
+    "vague_issues": 1,
+    "false_positive_count": 1,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.85,
+    "score_calibration": "loose",
+    "quality_grade": "B",
+    "notes": "E2E 重构审查到位，覆盖时序脆弱、固定等待、凭证硬编码、报告敏感信息等实质问题，均可落地。'硬编码测试凭证'在 E2E 中属合理。8 个实质问题但严重度低，80 分略宽松。整体良好。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-31",
+  "project": "Apex",
+  "title": "历史 review id=31 (score=54)",
+  "report_file": "analysis/exports/samples/review_31.md",
+  "labels": {
+    "id": 31,
+    "project": "Apex",
+    "score": 54,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 15,
+    "vague_issues": 1,
+    "false_positive_count": 2,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.9,
+    "score_calibration": "good",
+    "quality_grade": "B",
+    "notes": "F/S/B/P/C 五类表格化问题，最全面具体。覆盖区域同步空列表、分页死循环、token 日志泄露等核心缺陷。'childs→children'命名、日志拼接等轻微琐碎。54 分与严重缺陷匹配。质量高但含少量凑数项。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 good，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

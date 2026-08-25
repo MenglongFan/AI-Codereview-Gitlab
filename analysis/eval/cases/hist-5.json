@@ -1,0 +1,43 @@
+{
+  "case_id": "hist-5",
+  "project": "Dolphin-device",
+  "title": "历史 review id=5 (score=70)",
+  "report_file": "analysis/exports/samples/review_5.md",
+  "labels": {
+    "id": 5,
+    "project": "Dolphin-device",
+    "score": 70,
+    "structure_complete": true,
+    "missing_parts": [
+      "变更概述段落"
+    ],
+    "specificity_issues": 7,
+    "vague_issues": 1,
+    "false_positive_count": 2,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.8,
+    "score_calibration": "good",
+    "quality_grade": "B",
+    "notes": "RBAC/SQL 变更审查较到位，覆盖幂等、主键冲突、验证误判。但多数问题未给出具体文件行号，泛称'迁移脚本'；'文档缺换行符'、'硬编码时间戳'偏琐碎。明确承认无法验证后端代码。70 分基本合理。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 good，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

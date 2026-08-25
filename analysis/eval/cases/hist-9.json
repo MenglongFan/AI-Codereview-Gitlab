@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-9",
+  "project": "dolphin-auth",
+  "title": "历史 review id=9 (score=86)",
+  "report_file": "analysis/exports/samples/review_9.md",
+  "labels": {
+    "id": 9,
+    "project": "dolphin-auth",
+    "score": 86,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 2,
+    "vague_issues": 1,
+    "false_positive_count": 2,
+    "missed_critical_count": 2,
+    "actionable_ratio": 0.65,
+    "score_calibration": "loose",
+    "quality_grade": "C",
+    "notes": "高危数据库字段贯通修复，却未深审 6 entity+6 task 核心写入逻辑，只揪住连带 PvCertificate 改动（且该改动很可能是正确的——提交说明明确'让雪花自动生成'），属于过度怀疑。时间戳一致性、测试命名属琐碎。对高风险 DB 变更给 86 分偏宽松，存在漏报核心风险。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 C（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

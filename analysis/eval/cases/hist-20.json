@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-20",
+  "project": "etl_station",
+  "title": "历史 review id=20 (score=75)",
+  "report_file": "analysis/exports/samples/review_20.md",
+  "labels": {
+    "id": 20,
+    "project": "etl_station",
+    "score": 75,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 5,
+    "vague_issues": 2,
+    "false_positive_count": 3,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.7,
+    "score_calibration": "loose",
+    "quality_grade": "C",
+    "notes": "纯'样式完善'提交被长篇大论。'移除按钮图标影响可识别性'、'表格列宽移除'、'后端颜色值样式注入风险'明显强挑毛病/牵强（颜色注入纯推测）。CSS 建议本身具体。对纯 UI 提交给 75 分偏高（功能30/40）。属于对明显低风险代码的误报倾向。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 C（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

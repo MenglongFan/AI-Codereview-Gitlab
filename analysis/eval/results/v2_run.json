@@ -1,0 +1,126 @@
+[
+  {
+    "case_id": "mr-32",
+    "findings": [
+      {
+        "location": "internal/data-process/subscriber/utils/util.go:EnsureNetwork/EnsureHostNetwork",
+        "severity": "medium",
+        "text": "新增的 `EnsureNetwork` 与 `EnsureHostNetwork` 均采用“先 `First()` 查询，若未命中再 `Create()`”的 check-then-create 写法，且未使用事务或唯一约束冲突处理。 - 证据：`EnsureNetwork` 中先执行 `dal.Q.ModelNetwork.WithContext(ctx).Where(...).First()`，在 `gorm.ErrRecordNotFound` 分支中直接执行 `dal.Q.ModelNetwork.WithContext(ctx).Create(network)`；`EnsureHostNetwork` 同样存在该模式。 - 影响：并发调用时，多个 goroutine 可能同时通过查询、同时执行创建，导致重复记录或唯一索引冲突，影响数据一致性。 - 建议：改为事务内查询/创建，或使用 `clause.OnConflict`/upsert；若数据库存在唯一约束，应捕获唯一约束冲突并重新查询已有记录。"
+      },
+      {
+        "location": "internal/data-process/subscriber/utils/util.go:EnsureHostNetwork",
+        "severity": "medium",
+        "text": "网络标识 `netid` 被硬编码为 `\"00\"`。 - 证据：`netid := \"00\"`。 - 影响：若业务上存在多个网络标识或后续需要扩展，所有主机网络都会错误关联到同一个 `ModelNetwork`，存在数据一致性风险；同时降低代码可维护性。 - 建议：将 `netid` 作为参数传入，或定义为具名常量并补充业务语义注释。"
+      },
+      {
+        "location": "internal/data-process/subscriber/utils/util.go:EnsurePeripheral/EnsureNetwork/EnsureHostNetwork",
+        "severity": "trivial",
+        "text": "注释与函数名不一致，且新增注释存在文字错误。 - 证据： - `// EnsureUSBPeripheral 确保外设设备记录存在，不存在则创建` 下方函数已改名 `EnsurePeripheral`； - `// EnsureNetwork 确保网络接记录存在，不存在则创建`； - `// EnsureHostNetwork 确保主机网络接记录存在，不存在则创建`。 - 影响：降低代码可读性，容易误导后续维护者。 - 建议：将注释更新为与函数名一致，并修正“接记录”为“记录”或“接口记录”。"
+      }
+    ]
+  },
+  {
+    "case_id": "mr-33",
+    "findings": [
+      {
+        "location": "FusionAlgoInstanceController.java: benchmarkFetchTdbAsync/约行 190-199",
+        "severity": "medium",
+        "text": "代码直接对 `Map<String,Object> params` 做强制类型转换：`List<String> instanceIds = (List<String>) params.get(\"instanceIds\");`、`String startTime = (String) params.get(\"startTime\");`、`Boolean mergePoints = params.get(\"mergePoints\") != null ? (Boolean) params.get(\"mergePoints\") : true;`。 - 影响：当前端传入 `instanceIds` 为非 List、`startTime` 为非 String、`mergePoints` 为字符串 `\"false\"` 等时，会触发 `ClassCastException`，接口直接返回 500，健壮性差。 - 建议：新增请求 DTO，并配合 `@Validated` 校验参数；或在控制层安全拆解、校验类型后再调用 Service。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: benchmarkFetchTdbDataAsync/约行 1790-1810",
+        "severity": "medium",
+        "text": "对 `instanceIds` 仅执行 `stream().distinct().collect(Collectors.toList())`，未过滤 null，也未限制数量；后续对每个 `mergedSqlList` 元素都创建 `CompletableFuture`。 - 影响：恶意或异常请求可传入超大实例 ID 列表，导致大量点位查询、SQL 提取以及大量异步任务无上限下发给 `ForkJoinPool.commonPool()`，容易引发资源耗尽和线程池饥饿。 - 建议：增加最大实例数、最大点位数限制，过滤 null 元素，超过阈值时抛出业务异常或分批执行。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: benchmarkFetchTdbDataAsync/约行 1792-1805",
+        "severity": "medium",
+        "text": "解析时间字符串失败时仅 `log.warn(\"解析压测时间失败\", e);`，`startSec`、`endSec` 保持为 0，后续仍会继续执行取数。 - 影响：会被替换为 `0` 作为时间戳传入 SQL，可能查询异常时间范围甚至造成全量扫描，压测结果完全失真，增加 TDB 压力。 - 建议：解析失败直接抛出 `ServiceException` 或终止压测，不允许以默认值继续执行。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: benchmarkFetchTdbDataAsync/约行 1818-1822",
+        "severity": "medium",
+        "text": "代码中写死默认数据源：`if (datasourceId == null) { datasourceId = 1L; }`。 - 影响：当点位表和 extractionSql 均未提供 `datasource_id` 时，会错误地查询 ID=1 的数据源，可能导致取数失败或访问错误数据源。 - 建议：禁止硬编码默认 ID，应在无法确定数据源时抛出业务异常，提示用户配置缺失。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: benchmarkFetchTdbDataAsync/约行 2010-2025",
+        "severity": "medium",
+        "text": "非 `JsTdbDataSourceStrategy` 分支中，`fetchTimeAccumulatedMs = System.currentTimeMillis() - overallStart;`。 - 影响：该值被赋为物理总墙上时间，但 JsTdb 分支中 `fetchTimeAccumulatedMs` 是各任务 `rawRes[0]` 的累加纯 API 耗时，两者口径不一致。前端会将其展示为“多线程累计纯 API 耗时”，导致压测数据不可信。 - 建议：统一两种策略分支的耗时统计口径，或在结果中明确标注指标含义，避免误导用户。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: benchmarkFetchTdbDataAsync/约行 1935",
+        "severity": "trivial",
+        "text": "代码中残留调试输出：`System.out.println(\"11111122222:\"+ ForkJoinPool.commonPool().getParallelism());`。 - 影响：生产环境打印无意义调试信息，污染控制台输出，并暴露线程池并行度参数。 - 建议：删除该行，必要时改用 `log.debug`。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java: 文件头部 import/约行 40-43",
+        "severity": "trivial",
+        "text": "将原来的具体并发包导入（如 `java.util.concurrent.CompletableFuture` 等）替换为通配符导入：`import java.util.concurrent.*;`。 - 影响：降低代码可读性，不符合行业常见的显式导入规范。 - 建议：恢复为显式导入，避免 `*` 通配符。"
+      },
+      {
+        "location": "IFusionAlgoInstanceService.java: 新增方法注释/约行 156-176",
+        "severity": "trivial",
+        "text": "无 `mergePoints` 参数的重载方法与带 `mergePoints` 参数的方法注释几乎完全相同，未体现参数差异或说明该重载是默认归并模式。 - 影响：接口契约不够清晰，后续维护者难以从注释判断两个方法的区别。 - 建议：简化重载注释，指向主方法或明确标注“默认 mergesPoints=true”。"
+      }
+    ]
+  },
+  {
+    "case_id": "mr-34",
+    "findings": []
+  },
+  {
+    "case_id": "mr-36",
+    "findings": [
+      {
+        "location": "src/views/customer_communication/TagCategory.vue: handleAdd/handleView/handleEdit/handleDelete",
+        "severity": "high-value",
+        "text": "核心操作按钮均为占位实现，仅弹出“新增/查看/编辑/删除功能待实现”，未提供真实业务逻辑。 影响：分类管理的核心操作不可用，用户无法完成新增、查看、编辑、删除，页面仅有查询展示能力。 建议：补齐对应业务逻辑；若暂未实现，应通过按钮禁用、菜单隐藏等方式限制入口，避免暴露不可用功能。 证据：`ElMessage.info('新增功能待实现')`、`ElMessage.info('查看功能待实现')`、`ElMessage.info('编辑功能待实现')`、`ElMessage.info('删除功能待实现')`。"
+      },
+      {
+        "location": "src/views/customer_communication/TagCategory.vue: getTreeData/getTableData",
+        "severity": "medium",
+        "text": "异步请求的 `catch` 分支仅执行 `console.error(...)`，未向用户反馈错误信息。 影响：接口失败或网络异常时页面静默无提示，用户可能误以为无数据或功能无响应，降低可诊断性与用户体验。 建议：在 `catch` 中增加 `ElMessage.error` 或统一接入全局请求错误处理机制。 证据：`catch (error) { console.error('获取树形结构失败:', error) }`、`catch (error) { console.error('获取列表失败:', error) }`。"
+      },
+      {
+        "location": "src/views/customer_communication/TagCategory.vue: getTableData",
+        "severity": "medium",
+        "text": "在 `res.code === 200` 分支中直接访问 `res.data.records`、`res.data.total`，未对 `res.data` 做空值/结构保护。 影响：若后端返回 `data` 为 `null`/`undefined` 或字段缺失，会触发 `TypeError`，导致页面运行错误。 建议：使用默认对象兜底，例如 `const data = res.data || {}; tableData.value = data.records || []; total.value = data.total || 0;`。 证据：`tableData.value = res.data.records || []`、`total.value = res.data.total || 0`。"
+      },
+      {
+        "location": "src/views/customer_communication/TagCategory.vue: el-tree",
+        "severity": "trivial",
+        "text": "使用 `:default-expand-all=\"true\"` 会让树组件在初始化时展开所有节点。 影响：当分类树节点数量较多时，一次性渲染大量 DOM 可能造成首屏渲染卡顿。 建议：根据业务数据规模评估，改为默认展开指定层级或使用懒加载。 证据：`:default-expand-all=\"true\"`。"
+      }
+    ]
+  },
+  {
+    "case_id": "mr-42",
+    "findings": [
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java:约677行",
+        "severity": "high-value",
+        "text": "同步落盘分支返回错误的 resultId - 问题描述：同步落盘逻辑中，`persistTask.run()` 执行后直接返回 `finalExistingId != null ? finalExistingId : 0L`。当 `existingId` 为 `null` 且实际执行了 `storageProvider.saveResult(...)` 创建新记录时，方法返回 `0L` 而不是真实的 `resultId`。 - 关键代码： ```java persistTask.run(); // 单任务同步落盘回退，保证记录 ID 完整返回 return finalExistingId != null ? finalExistingId : 0L; ``` - 影响：调用方依赖返回的 `resultId` 进行后续处理（如关联业务、审计追踪、幂等控制），获得 `0L` 将导致数据链路断裂或业务逻辑错误。 - 建议：同步分支应返回 `persistTask` 内部实际计算出的 `resultId`，例如将 `resultId` 提升为 `final` 包裹类型或返回值；或者重构方法，从 `persistTask` 中取出真实 ID 再返回。"
+      },
+      {
+        "location": "FusionAlgoInstanceServiceImpl.java:约674行",
+        "severity": "high-value",
+        "text": "异步落盘直接返回 0L 且异常仅记录日志 - 问题描述：批量调度模式（`preloadedVersion != null` 或线程名以 `fusion-batch-` 开头）下，将落盘任务提交到 `batchExecutor` 后立即返回 `0L`，不再等待执行结果。当落盘失败时，`catch` 块仅记录错误日志，调用方无法感知失败。 - 关键代码： ```java if (preloadedVersion != null || Thread.currentThread().getName().startsWith(\"fusion-batch-\")) { CompletableFuture.runAsync(persistTask, batchExecutor); return 0L; // 批量模式异步落盘，立即释放 Worker 线程 } ``` ```java catch (Exception e) { log.error(\"【算法结果落盘失败】实例: {} (ID: {}), 任务: {}, 错误: {}\", instance.getInstanceName(), instanceId, taskName, e.getMessage(), e); } ``` - 影响：调用方误认为落盘成功（返回值 0L 可能被解释为成功），实际数据可能未写入数据库或事件未发布，造成数据丢失"
+      },
+      {
+        "location": "FusionAlgoContextLoader.java:putOrUpdateTimeSeriesResult方法",
+        "severity": "medium",
+        "text": "并发合并大列表存在性能瓶颈与复制开销 - 问题描述：在 `ConcurrentHashMap.compute` 中对每个 key 进行 `new ArrayList<>(existing.size() + timeSeries.size())` 并复制两个列表。当 `timeSeries` 规模较大（如数万条时序数据）且高并发时，频繁的内存分配与复制会引发 GC 压力。 - 关键代码： ```java List<FusionTimeSeriesDTO> merged = new ArrayList<>(existing.size() + timeSeries.size()); merged.addAll(existing); merged.addAll(timeSeries); return merged; ``` - 影响：在高并发加载大数据量场景下，线程竞争与列表复制可能成为性能瓶颈。 - 建议：评估是否必须进行物理合并，可考虑使用分段容器或延迟合并；若需保持列表不可变，可尝试批量追加后再生成最终列表。"
+      },
+      {
+        "location": "TradingPriceMockSupplier.java:约73行",
+        "severity": "medium",
+        "text": "日期字符串截取未校验长度 - 问题描述：`targetDateStr = timeVal.getValue().toString().substring(0, 10);` 假设时间字符串长度至少 10，若传入格式非预期（如仅时间、无日期部分），将抛出 `StringIndexOutOfBoundsException`，异常被外层捕获后 `targetDateStr` 保持 `null`，导致电价数据装配被静默跳过。 - 关键代码： ```java targetDateStr = timeVal.getValue().toString().substring(0, 10); ``` - 影响：目标日期解析失败时，交易算子的前置电价数据缺失，影响算法计算结果正确性。 - 建议：使用日期解析工具（如 `DateUtil.parse`）或先校验长度/格式，避免直接截取；对无法识别的格式给出明确告警。"
+      },
+      {
+        "location": "JsTdbDataSourceStrategy.java:约369行",
+        "severity": "medium",
+        "text": "日志直接输出集合存在 NPE 风险且可能造成日志膨胀 - 问题描述：日志语句中直接调用 `queryKeys.size()` 并打印 `queryKeys` 集合，未进行判空。若 `queryKeys` 为 `null`，将触发 `NullPointerException`；若集合很大，日志输出会占用大量磁盘与网络资源。 - 关键代码： ```java log.info(\"📢【纯极生 TDBAPI.select 测试】#{} | 表: {} | kids点位({}): {} | 纯极生物理耗时: {} ms | 返回数据记录行数(docs): {}\", currentCount, tableName, queryKeys.size(), queryKeys, selectTime, totalDocCount); ``` - 影响：可能导致日志打印失败或服务因日志量过大而性能下降。 - 建议：先判空，并限制日志内容长度或只输出集合大小，避免直接打印整个集合。"
+      }
+    ]
+  }
+]

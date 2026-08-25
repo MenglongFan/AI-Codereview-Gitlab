@@ -1,0 +1,62 @@
+{
+  "case_id": "mr-42",
+  "project": "etl_station",
+  "title": "FusionAlgoContextLoader 大规模重构 (+458/-367)",
+  "diff_ref": "analysis/exports/gitlab_export/review_42_diff.json",
+  "ground_truth": [
+    {
+      "location": "FusionAlgoContextLoader:load",
+      "severity": "high-value",
+      "desc": "resultId 丢失（同步/异步路径）",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader:load",
+      "severity": "high-value",
+      "desc": "异步异常吞噬 + 返回 0L",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "medium",
+      "desc": "并发合并重复",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "medium",
+      "desc": "queryKeys 日志",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "trivial",
+      "desc": "通配符导入",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "trivial",
+      "desc": "线程名判断",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "trivial",
+      "desc": "日期截取",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "medium",
+      "desc": "orTimeout 使用",
+      "fn": false
+    },
+    {
+      "location": "FusionAlgoContextLoader",
+      "severity": "medium",
+      "desc": "旧逻辑删除迁移正确性未验证",
+      "fn": true
+    }
+  ]
+}

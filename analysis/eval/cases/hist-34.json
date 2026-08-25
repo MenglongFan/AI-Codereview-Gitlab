@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-34",
+  "project": "eagle_v2",
+  "title": "历史 review id=34 (score=88)",
+  "report_file": "analysis/exports/samples/review_34.md",
+  "labels": {
+    "id": 34,
+    "project": "eagle_v2",
+    "score": 88,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 1,
+    "vague_issues": 1,
+    "false_positive_count": 1,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.6,
+    "score_calibration": "loose",
+    "quality_grade": "B",
+    "notes": "仅 5 行小变更，发现 1 个推测性 nil 指针风险 + 1 个正面注释。该 nil 担忧与 id=12（称二级指针是错误）判断相反，存在推测/误报成分。风险存疑却给 88 分偏高。整体偏宽松。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 B（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

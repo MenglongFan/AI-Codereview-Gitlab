@@ -1,0 +1,41 @@
+{
+  "case_id": "hist-12",
+  "project": "eagle_v2",
+  "title": "历史 review id=12 (score=73)",
+  "report_file": "analysis/exports/samples/review_12.md",
+  "labels": {
+    "id": 12,
+    "project": "eagle_v2",
+    "score": 73,
+    "structure_complete": true,
+    "missing_parts": [],
+    "specificity_issues": 6,
+    "vague_issues": 0,
+    "false_positive_count": 1,
+    "missed_critical_count": 0,
+    "actionable_ratio": 0.9,
+    "score_calibration": "loose",
+    "quality_grade": "A",
+    "notes": "覆盖 IP JSON 结构兼容性变更、错误忽略、签名变更、copier.Copy 二级指针等核心风险，位置明确、建议可落地。仅'需确认调用点'一条为确认类。问题中等偏重但给 73 分略宽松。整体高质量。"
+  },
+  "ground_truth": [
+    {
+      "location": "report:structure",
+      "severity": "medium",
+      "desc": "报告结构完整率 100%（标注维度），复测时按四要素核查",
+      "fn": false
+    },
+    {
+      "location": "report:calibration",
+      "severity": "medium",
+      "desc": "分数校准 loose，期望与标注一致",
+      "fn": false
+    },
+    {
+      "location": "report:quality",
+      "severity": "high-value",
+      "desc": "质量等级 A（A 高质量 ~ D 差），作为评级目标",
+      "fn": false
+    }
+  ]
+}

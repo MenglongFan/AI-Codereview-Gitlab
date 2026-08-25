@@ -1,0 +1,38 @@
+{
+  "case_id": "mr-32",
+  "project": "eagle_v2",
+  "title": "util.go EnsureHostNetwork 上传下载下移 (+76/-8)",
+  "diff_ref": "analysis/exports/gitlab_export/review_32_diff.json",
+  "ground_truth": [
+    {
+      "location": "internal/data-process/subscriber/utils/util.go:EnsureHostNetwork",
+      "severity": "high-value",
+      "desc": "copier.Copy(hostNetwork, network) 覆盖 SOURCE，未用本次 source 参数",
+      "fn": false
+    },
+    {
+      "location": "internal/data-process/subscriber/utils/util.go",
+      "severity": "medium",
+      "desc": "新增中文错误消息与既有语言不一致",
+      "fn": false
+    },
+    {
+      "location": "internal/data-process/subscriber/utils/util.go",
+      "severity": "trivial",
+      "desc": "注释错别字（'确保网络接记录存在'）",
+      "fn": false
+    },
+    {
+      "location": "internal/data-process/subscriber/utils/util.go:EnsureNetwork",
+      "severity": "medium",
+      "desc": "逐条查询（N+1），可批量查询",
+      "fn": false
+    },
+    {
+      "location": "internal/data-process/subscriber/utils/util.go",
+      "severity": "medium",
+      "desc": "NETID 硬编码 '00'，限制多网络支持",
+      "fn": true
+    }
+  ]
+}
