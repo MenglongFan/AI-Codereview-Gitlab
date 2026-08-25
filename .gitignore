@@ -26,6 +26,9 @@ data/repo_cache/
 .coverage
 .pytest_cache/
 
+# GitLab 导出数据（含真实员工姓名/邮箱/内网地址，不入库）
+analysis/exports/
+
 # CodeBuddy IDE project data
 /.codebuddy/
 /.workbuddy/
